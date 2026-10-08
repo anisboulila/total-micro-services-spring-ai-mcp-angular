@@ -18,11 +18,11 @@
 
 - [x] 2.1 Documenter les responsabilités, technologies, dépendances, données et communications des composants observés dans la référence, puis distinguer leur pertinence éventuelle pour notre cible sans présumer de leur conservation.
 - [x] 2.2 Recenser les routes REST observées et décrire les appels frontend passant par le Gateway.
-- [ ] 2.3 Décrire Eureka et le discovery locator du Gateway, en séparant configuration observée et comportement runtime non vérifié.
-- [ ] 2.4 Décrire EBank → Feign → REST Customer, incluant le circuit breaker, son fallback et le risque associé à la création de comptes.
-- [ ] 2.5 Décrire les outils MCP, le bot Spring AI, le LLM et les entrées Telegram/Discord; distinguer destinations MCP statiques et découverte Eureka.
-- [ ] 2.6 Comparer les frontends et consigner leurs écarts observés ainsi que leur rôle encore indéterminé.
-- [ ] 2.7 Expliquer la distinction REST synchrone, Feign, MCP et streaming HTTP sans présenter d'événementiel métier comme existant.
+- [x] 2.3 Décrire Eureka et le discovery locator du Gateway, en séparant configuration observée et comportement runtime non vérifié.
+- [x] 2.4 Décrire EBank → Feign → REST Customer, incluant le circuit breaker, son fallback et le risque associé à la création de comptes.
+- [x] 2.5 Décrire les outils MCP, le bot Spring AI, le LLM et les entrées Telegram/Discord; distinguer destinations MCP statiques et découverte Eureka.
+- [x] 2.6 Comparer les frontends et consigner leurs écarts observés ainsi que leur rôle encore indéterminé.
+- [x] 2.7 Expliquer la distinction REST synchrone, Feign, MCP et streaming HTTP sans présenter d'événementiel métier comme existant.
 
 ## 3. Finaliser le System Design documentaire
 

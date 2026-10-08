@@ -347,55 +347,116 @@ suppression du préfixe de service, correspondance exacte des chemins, réponse
 des services et succès des appels. Ces points requièrent une validation runtime;
 ils ne sont pas supposés dans cette baseline.
 
+#### Eureka et découverte du Gateway — tâche 2.3
+
+**Faits vérifiés dans la référence** :
+
+- `discovery-service` active Eureka Server sur le port `8761`; ses propriétés
+  désactivent `register-with-eureka` et `fetch-registry`.
+- Gateway, Customer, EBank et Bot déclarent un client Eureka ou une configuration
+  de discovery active dans les manifests/propriétés consultés. Gateway, Customer
+  et EBank ont `spring.cloud.discovery.enabled=true`; Bot déclare également
+  cette propriété. Cette présence/configuration établit une intention de client,
+  pas que chaque instance s'est effectivement enregistrée.
+- La classe de démarrage du Gateway construit un
+  `DiscoveryClientRouteDefinitionLocator` à partir d'un
+  `ReactiveDiscoveryClient` et de `DiscoveryLocatorProperties`.
+- Les chemins frontend utilisent les préfixes logiques `EBANK-SERVICE` et
+  `EBANK-BOT`. Le Bot, bien qu'il déclare Eureka Client, configure ses
+  connexions MCP avec des URL `localhost` fixes; ces destinations ne sont pas
+  obtenues via Eureka.
+- Le YAML du Gateway contient des routes statiques vers `localhost:8056` et
+  `localhost:8057` pour `/customers/**` et `/accounts/**`, mais les lignes sont
+  commentées et ne configurent donc pas ces routes statiques activement.
+
+**Déduction** : le locator permet au Gateway de construire des définitions de
+route à partir des instances connues du client Discovery, plutôt que de reposer
+uniquement sur les deux destinations statiques proposées dans le YAML. Eureka
+joue le rôle du registre auquel les clients peuvent publier ou demander les
+informations d'instances; son usage par le locator est la relation configurée
+qui explique la destination logique des préfixes frontend.
+
+**Non vérifié en runtime** : enregistrement et renouvellement des clients dans
+Eureka, contenu du registre, génération des routes, forme exacte des URI et
+prédicats générés, conservation/réécriture du préfixe, choix d'instance,
+équilibrage et comportement en cas d'indisponibilité d'Eureka. Aucun appel
+frontend n'a été exécuté contre cette référence dans le cadre de cette
+documentation; le succès du routage n'est donc pas affirmé.
+
+**Question ouverte pour notre architecture** : une découverte dynamique est-elle
+nécessaire compte tenu de notre topologie et de notre mode d'exécution, et le
+couplage Gateway/Eureka apporte-t-il suffisamment de valeur face à des routes
+explicites ou une autre approche? Aucune solution cible n'est retenue ici.
+
 ### 4.3 EBank → Customer via Feign/REST
 
 ```text
-Client
-  -> EBank REST / MCP
-  -> EbankService
-  -> CustomerRestClient (@FeignClient(name = "customer-service"))
-  -> HTTP GET /customers/{id}
-  -> Customer Service
-  -> H2 Customer
+Parcours de lecture par identifiant :
+Client -> EBank (REST ou outil MCP) -> EbankService
+       -> CustomerRestClient -> HTTP GET /customers/{id} -> Customer
+
+Parcours de création :
+Client -> EBank (REST ou outil MCP) -> EbankService.save
+       -> CustomerRestClient -> HTTP GET /customers/{customerId} -> Customer
+       -> sauvegarde BankAccount dans le dépôt EBank
 ```
 
-**Déduction architecturale** : l'échange est synchrone puisque l'appelant attend
-la réponse. Feign fournit l'abstraction déclarative du client, mais l'interface
-distante reste REST/HTTP. EBank enregistre le compte dans sa propre base.
+**Faits vérifiés dans la référence** :
 
-**Fait vérifié (référence)** : `getBankAccountById` enrichit le compte avec la
-réponse Customer; `save` consulte Customer avant la sauvegarde; `getAllBankAccounts`
-retourne le résultat du dépôt sans appel Customer.
+- `CustomerRestClient` est annoté `@FeignClient(name = "customer-service")` et
+  déclare `GET /customers/{id}` avec `@PathVariable Long id`.
+- L'appel est exécuté depuis EBank pour enrichir un compte retourné par
+  `getBankAccountById`, et avant la sauvegarde dans `EbankService.save`.
+  `getAllBankAccounts` retourne les comptes du dépôt sans cet appel Customer.
+- Le client porte `@CircuitBreaker(name = "customerService",
+  fallbackMethod = "getDefaultCustomer")`. Le fallback retourne un Customer
+  portant l'identifiant demandé et les valeurs `"Not available"` pour le nom
+  et l'email.
+- Dans `save`, le résultat de `getCustomerById` n'est pas utilisé pour valider
+  les champs du client avant de générer l'identifiant du compte et d'appeler le
+  dépôt pour sauvegarder le compte. Le fallback retourne un objet Customer et
+  non une exception au parcours appelant.
 
-**Risque déduit** : l'annotation circuit breaker du Feign client peut appeler un
-fallback synthétique (« Not available »); la sauvegarde ne valide pas ensuite que
-le Customer retourné est réel. Une panne peut ainsi permettre l'enregistrement
-d'un compte sans validation effective du client.
+**Analyse / déduction** : OpenFeign fournit ici une interface cliente
+déclarative pour un appel HTTP/REST nommé par l'identifiant `customer-service`;
+Feign n'est pas un protocole réseau distinct. La méthode appelante attend la
+réponse Customer avant de poursuivre, ce qui en fait une dépendance
+request/response synchrone. Le nom logique permet au mécanisme de découverte
+configuré de résoudre le service, mais la résolution effective n'est pas testée.
 
-**À confirmer** : politiques de timeout/retry/circuit breaker réellement actives,
-codes d'erreur et règles métier attendues lors d'une panne Customer.
+**Risque architectural déduit** : si le circuit breaker déclenche son fallback
+suite à une erreur d'appel, celui-ci fournit une réponse synthétique sans
+signaler l'échec par une exception à `save`. Puisque le code de sauvegarde
+n'examine pas le contenu retourné, une création peut continuer et persister un
+compte sans validation effective du client. Ce constat décrit le chemin de code
+et son risque potentiel; la manifestation dépend des conditions d'exécution et
+n'a pas été testée.
+
+**À confirmer** : seuils et état runtime du circuit, timeouts, retries, réponse
+HTTP/codes d'erreur, et règle métier attendue lorsqu'un client est absent ou
+Customer indisponible. **Question ouverte pour notre architecture** : quels
+parcours nécessitent une validation synchronisée, et quelle issue métier doit
+être retournée lorsque cette dépendance n'est pas disponible? Aucune politique
+cible n'est décidée ici.
 
 ### 4.4 Bot → Spring AI → MCP → services
 
 ```text
-Utilisateur web --> Gateway --> Bot /chat ou /chatStream
-Telegram (long polling) -------> Bot
-Discord (message event) -------> Bot
-                                  |
-                                  v
-                          Spring AI ChatClient
-                          /               \
-                    OpenAI LLM       ToolCallbackProvider
-                                           |
-                                      MCP Client
-                                     /           \
-                   http://localhost:8056/mcp   http://localhost:8057/mcp
-                           |                            |
-                     Customer MCP                 EBank MCP
-                           |                            |
-                  Customer methods            EbankService methods
-                                                        |
-                                                        +-- Feign --> Customer
+Web : Angular -> Gateway -> Bot HTTP /chat ou /chatStream ----+
+Telegram (long polling) --------------------------------------+
+Discord (message event) --------------------------------------+
+                                                              v
+                                                    EbankAIAgent / ChatClient
+                                                      /               \
+                                                OpenAI LLM        ToolCallbackProvider
+                                                                        |
+                                                                   MCP Client
+                                                                  /           \
+                             http://localhost:8056/mcp (Customer)   http://localhost:8057/mcp (EBank)
+                                            |                                  |
+                                CustomerService tools              EbankService tools
+                                                                               |
+                                                                               +-- Feign / REST --> Customer
 ```
 
 **Déduction architecturale** : ce diagramme synthétise les liens observés et le
@@ -404,32 +465,121 @@ requête appelle systématiquement le LLM et un outil MCP.
 
 **Faits vérifiés (référence)** :
 
-- Bot configure le modèle `gpt-4o`, un `ToolCallbackProvider` et un
-  `MessageChatMemoryAdvisor`.
-- Customer et EBank ont des méthodes métier annotées `@McpTool` et une
-  configuration MCP server WebMVC avec protocole `streamable`.
-- Le Bot configure des destinations MCP via localhost (`8056/mcp`, `8057/mcp`).
-- Telegram reçoit les messages en long polling; Discord transmet les messages
-  reçus à l'agent. La réponse est obtenue via `aiAgent.chat(...)`.
+- **Customer MCP** expose, via méthodes `@McpTool`, la liste des clients,
+  `findCustomerById(id)` et `saveCustomer(customer)`; les paramètres sont
+  annotés `@McpToolParam`. La méthode de recherche échoue si l'identifiant est
+  absent du repository; la méthode de création délègue au repository.
+- **EBank MCP** expose `getAllBankAccounts()`, `getBankAccountById(id)` et
+  `save(bankAccount)` comme capacités annotées `@McpTool`; certaines opérations
+  appellent Customer par `CustomerRestClient`.
+- Customer et EBank déclarent le starter MCP Server WebMVC et le protocole
+  serveur `streamable` dans les propriétés consultées.
+- Bot configure un MCP Client avec les URL fixes
+  `http://localhost:8056/mcp` (Customer) et
+  `http://localhost:8057/mcp` (EBank), et un `ToolCallbackProvider` est passé
+  à la construction du ChatClient.
+- `EbankAIAgent` construit le Spring AI `ChatClient`, configure une consigne
+  système, `MessageChatMemoryAdvisor` avec `ChatMemory`, et les callbacks
+  d'outils. Le modèle OpenAI configuré est `gpt-4o`. Les méthodes `chat` et
+  `chatStream` appellent respectivement `.call().content()` et
+  `.stream().content()`.
+- Le contrôleur Web expose `GET /chat` (réponse `String`) et
+  `GET /chatStream` (réponse `Flux<String>`); les deux prennent `query` avec
+  valeur par défaut `"Bonjour"`.
+- Le bot Telegram hérite de `TelegramLongPollingBot`, reçoit les updates et
+  passe les messages textuels à `aiAgent.chat(...)`, puis renvoie la réponse
+  dans la conversation. Le code accepte aussi un chemin image, mais le parcours
+  conversationnel général est textuel.
+- Le contrôleur Discord reçoit les événements de message, ignore les messages
+  d'autres bots, passe le texte brut à `aiAgent.chat(...)`, puis envoie la
+  réponse au canal.
 
-**Déductions** : les outils MCP réutilisent des méthodes métier et peuvent
-entraîner les mêmes effets métier que les interfaces de service; le parcours
-dépend du modèle externe et du service qui héberge l'outil. Les accès aux
-plateformes et au LLM sont des dépendances supplémentaires du bot.
+**Analyse / déductions** : Spring AI relie le prompt, la mémoire configurée et
+les outils callbacks dans le ChatClient. Le modèle peut choisir des outils
+disponibles, mais les sources ne prouvent pas qu'une requête donnée invoque
+systématiquement un outil. MCP fournit ici une interface de capacités pour le
+client AI, distincte des endpoints REST utilisés directement par les
+frontends. L'appel MCP vers les URL configurées est une relation directe
+déclarée, tandis que Eureka est un registre de services : le fait que le Bot
+déclare Eureka Client ne transforme pas les destinations MCP explicites en
+résolution Eureka. Les opérations MCP réutilisant les services métier peuvent
+avoir les mêmes effets que leurs méthodes sources.
+
+**Limites / risques** : le parcours dépend du fournisseur OpenAI, du réseau,
+du Bot, des deux serveurs MCP et des services métier. Une URL `localhost` fixe
+lie les destinations au contexte d'exécution configuré et ne montre pas, à elle
+seule, comment le Bot les joindrait dans une topologie multi-hôte. La
+configuration de `MessageChatMemoryAdvisor` ne prouve pas la durée, la portée
+ou la persistance de la mémoire. Les sources ne démontrent pas les contrôles
+d'accès aux capacités, les erreurs/timeout, ni la sélection effective des
+outils.
 
 **À confirmer** : contrôle d'accès aux outils, disponibilité et filtrage des
 outils, portée/stockage de la mémoire, traitement des erreurs, timeouts et
-comportement du bot en cas d'indisponibilité LLM/MCP.
+comportement du bot en cas d'indisponibilité LLM/MCP. **Question ouverte pour
+notre architecture** : quels cas d'usage requièrent un assistant, quelles
+capacités pourraient lui être ouvertes et MCP est-il préférable à des appels
+directs? Aucun bot, fournisseur, modèle ou protocole n'est choisi pour la cible.
+
+### 4.5 Comparaison des frontends — tâche 2.6
+
+**Faits vérifiés dans les manifests et sources de la référence** : les deux
+applications utilisent Angular 21.1 et déclarent TypeScript, RxJS, Bootstrap
+et ngx-markdown. Les deux chargent les comptes avec `GET
+http://localhost:9999/EBANK-SERVICE/accounts`; elles envoient le chat avec
+`GET http://localhost:9999/EBANK-BOT/chat?query=...`.
+
+| Aspect | `angular-front` | `ebank-ang-front` |
+|---|---|---|
+| Technologie déclarée | Angular 21.1, TypeScript, RxJS, Bootstrap, ngx-markdown. | Angular 21.1, TypeScript, RxJS, Bootstrap, ngx-markdown. |
+| Liste des comptes | Appelle `GET /EBANK-SERVICE/accounts` via `localhost:9999`. | Même chemin et même Gateway. |
+| Requête chat ordinaire | Appelle `GET /EBANK-BOT/chat?query=...`. | Appelle le même endpoint. |
+| Méthode cliente de chat nommée comme streaming | `askAgentStream()` appelle `/EBANK-BOT/chatStream?query=...`. | `askAgentSteam()` appelle `/EBANK-BOT/chat?query=...`, et non `/chatStream`; elle demande toutefois des événements/progression à `HttpClient`. |
+| Route streaming réellement demandée au serveur | `/chatStream`, correspondant à la route `Flux<String>` du Bot. | Le code consulté ne demande pas `/chatStream`. |
+
+**Analyse / limites** : le nom `askAgentSteam` et les options
+`observe: 'events'` / `reportProgress: true` ne démontrent pas que
+`ebank-ang-front` reçoit un flux progressif du serveur : son URL appelle le
+contrôleur `/chat`, qui retourne un `String`. À l'inverse,
+`angular-front` demande explicitement `/chatStream`. Ce sont des différences
+observées de code et de chemin; elles ne prouvent pas qu'elles sont voulues, ni
+que l'expérience effective a été validée. Aucune différence de rôle métier
+distinct n'est établie; les vues et parcours paraissent proches.
+
+**Question ouverte pour notre architecture** : faut-il une seule interface ou
+plusieurs, et les parcours comptes/chat nécessitent-ils un endpoint de réponse
+progressive? La raison de la duplication des frontends reste indéterminée;
+aucun nombre ni rôle cible n'est décidé ici.
 
 ## 5. Modes de communication et propriété des données
 
-| Mode | Statut de preuve et usage | Sémantique / limite |
+| Mode | Ce que c'est | Observation dans Youssfi et sémantique |
 |---|---|---|
-| REST/HTTP | **Fait vérifié (référence)** : APIs Customer, EBank, bot; transport sous-jacent de Feign. | **Déduction** : request/response synchrone dans les parcours observés. |
-| OpenFeign | **Fait vérifié (référence)** : EBank vers Customer via le nom de service `customer-service`. | **Déduction** : client déclaratif REST, pas protocole différent. |
-| MCP | **Fait vérifié (référence)** : Bot client vers serveurs de capacités Customer et EBank; configuration serveur `streamable`. | **Déduction** : contrat de capacité destiné au client AI, distinct des routes REST frontend. |
-| HTTP streaming | **Fait vérifié (référence)** : `/chatStream` du bot et appel correspondant depuis `angular-front`. | **Déduction** : réponse HTTP streamée; ne constitue pas un flux événementiel métier. |
-| Événementiel métier | **Fait vérifié (référence)** : aucun broker ou flux événementiel métier observé dans les sources consultées. | Kafka reste hors périmètre de cette évolution selon REQ-003/004/REQ-011. |
+| REST/HTTP synchrone | Interface HTTP appelée par un client qui attend la réponse de l'opération demandée. | **Fait vérifié** : les contrôleurs Customer, EBank et `/chat` exposent des routes HTTP. **Déduction** : les usages par ces opérations sont request/response; le résultat réel reste non testé. |
+| OpenFeign | Client déclaratif utilisé par du code Java pour appeler une interface HTTP distante. | **Fait vérifié** : EBank nomme `customer-service` et appelle `GET /customers/{id}`. Feign n'est pas un protocole distinct de REST; il masque l'écriture explicite du client HTTP. |
+| MCP | Protocole/interface client-serveur utilisé ici pour mettre des capacités métier à disposition du client MCP du bot. | **Fait vérifié** : le Bot est client, Customer et EBank exposent des outils, et les propriétés indiquent le transport serveur `streamable`. C'est distinct des routes REST directement consommées par les frontends. |
+| HTTP streaming | Réponse d'une requête HTTP dont le contenu peut être fourni progressivement au client, au lieu d'attendre un corps complet. | **Fait vérifié** : `/chatStream` retourne `Flux<String>` et `angular-front` demande cette route. Cela reste une réponse liée à une requête HTTP; ce n'est pas un broker d'événements métier. |
+| Événementiel métier / Kafka | Échange par événements via un mécanisme de messagerie, distinct d'un appel HTTP direct ou d'un flux de réponse HTTP. | **Fait vérifié** : aucun broker ni flux événementiel métier n'a été identifié dans les sources consultées de la référence. Kafka n'est donc pas décrit comme existant ni introduit dans cette évolution. |
+
+**Distinctions à retenir (tâche 2.7)** :
+
+- **REST synchrone** : un client appelle un endpoint HTTP et attend sa réponse.
+- **Feign** : façon déclarative, côté client Java, d'effectuer l'appel REST/HTTP
+  EBank → Customer; ce n'est pas un protocole concurrent de REST.
+- **MCP** : interface de capacités utilisée entre le client MCP du Bot et les
+  serveurs MCP Customer/EBank; la configuration `streamable` ne signifie pas
+  qu'un événement métier est publié/consommé.
+- **HTTP streaming** : pour `/chatStream`, le Bot fournit progressivement des
+  éléments dans la réponse de la requête HTTP; ce mécanisme ne correspond ni à
+  Kafka ni à de l'événementiel métier.
+
+**Conclusion vérifiée dans le périmètre inspecté** :
+`HTTP streaming ≠ Kafka ≠ événementiel métier`. Aucun flux Kafka ou événement
+métier asynchrone n'est démontré dans la référence consultée. **Question
+ouverte pour notre architecture** : chaque interaction exige-t-elle une réponse
+immédiate, une réponse HTTP progressive, ou existe-t-il un besoin métier
+indépendant qui justifierait un échange événementiel? Aucune option cible n'est
+choisie ici.
 
 La propriété des données est **déduite** du découpage et des persistences :
 Customer détient Customer dans son H2; EBank détient BankAccount dans son H2 et
