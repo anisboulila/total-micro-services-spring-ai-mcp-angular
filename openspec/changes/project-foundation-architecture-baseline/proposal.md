@@ -4,9 +4,9 @@
 
 Le workspace du projet contient actuellement `PROJECT-CONTEXT.md` et
 `requirements.md`, mais aucun code applicatif permettant de vérifier localement
-les composants qu'ils décrivent. Le dépôt Youssfi est accessible et sert de
-référence pédagogique, mais son implémentation ne doit être ni copiée ni ajoutée
-comme dépendance.
+les composants qu'ils décrivent. Le dépôt Youssfi est accessible comme référence
+métier et pédagogique; son implémentation ne doit être ni copiée ni ajoutée
+comme dépendance, et son architecture ne détermine pas la cible du projet.
 
 Avant toute évolution fonctionnelle, il faut établir une baseline de System
 Design qui distingue les constats observés dans cette référence, les déductions
@@ -17,15 +17,20 @@ la référence comme l'implémentation locale.
 ## What Changes
 
 - Formaliser, dans le change OpenSpec, les responsabilités, données, interfaces,
-  dépendances et communications des composants identifiés par `requirements.md`.
-- Décrire les flux frontend/Gateway, EBank/Customer et Bot/Spring AI/MCP à partir
-  du code de référence consulté.
+  dépendances et communications des composants observés dans le dépôt de
+  référence, sans les imposer à l'architecture cible du projet.
+- Décrire les flux frontend/Gateway, EBank/Customer et Bot/Spring AI/MCP comme
+  flux de référence, puis distinguer leur analyse de tout choix cible.
 - Distinguer REST synchrone, Feign comme client REST déclaratif, MCP et streaming
   HTTP; identifier qu'aucune communication événementielle métier n'est observée.
 - Documenter Eureka, Gateway, H2/JPA, Resilience4j et les deux applications
   Angular avec leurs limites observées.
 - Présenter les choix, alternatives, compromis, risques et questions ouvertes
   dans une section System Design détaillée.
+- Formaliser que la référence Youssfi est une source d'inspiration métier et
+  pédagogique, pas un blueprint : les composants de notre architecture seront
+  retenus, fusionnés, ajoutés, remplacés ou supprimés selon les exigences et le
+  System Design, sans fidélité imposée.
 - Aligner `PROJECT-CONTEXT.md` sur la baseline vérifiée et alimenter
   `interview.md` pour cette évolution, sans convertir les constats de la
   référence en faits locaux.

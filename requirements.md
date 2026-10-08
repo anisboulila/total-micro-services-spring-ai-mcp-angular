@@ -2,21 +2,21 @@
 
 ## 1. Objectif
 
-Établir la première fondation formelle du projet afin de pouvoir faire évoluer progressivement le repository vers une architecture moderne Java/Spring orientée microservices, System Design et AI Engineering.
+Établir la première fondation formelle du projet afin de pouvoir faire évoluer progressivement le repository vers une architecture moderne adaptée à ses besoins, en s'appuyant sur Java/Spring, System Design et AI Engineering lorsque ces choix sont justifiés.
 
 Cette première évolution ne doit pas implémenter Kafka, Keycloak, RAG, Redis, Kubernetes ou les autres fonctionnalités avancées.
 
-Elle doit d'abord formaliser l'architecture actuelle et préparer le projet à ses évolutions futures.
+Elle doit d'abord formaliser l'architecture observée dans le dépôt de référence, l'analyser et poser les critères qui guideront la conception de NOTRE architecture. Elle ne doit pas considérer l'architecture de référence comme une architecture cible obligatoire.
 
 ---
 
 # 2. Contexte
 
-Le projet est basé sur le repository de référence :
+Le projet s'inspire du repository de référence :
 
 https://github.com/mohamedYoussfi/totale-micro-services-spring-ai-mcp-angular-telegram-discord
 
-Le repository contient actuellement plusieurs composants :
+Le repository de référence contient notamment les composants suivants, qui sont des sujets d'analyse et non une liste de composants imposés à notre architecture :
 
 * `discovery-service`
 * `gateway-service`
@@ -26,7 +26,7 @@ Le repository contient actuellement plusieurs composants :
 * `angular-front`
 * `ebank-ang-front`
 
-L'architecture actuelle repose notamment sur :
+L'implémentation observée dans ce repository de référence utilise notamment :
 
 * Java
 * Spring Boot
@@ -44,7 +44,7 @@ L'architecture actuelle repose notamment sur :
 * Discord
 * Angular
 
-Cette première évolution doit permettre de transformer cette base en projet pédagogique structuré et maîtrisé.
+Cette première évolution doit permettre de comprendre l'idée métier et les choix de cette référence, d'en analyser les avantages, limites et compromis, puis de concevoir progressivement un projet pédagogique structuré et maîtrisé qui peut s'en écarter.
 
 ---
 
@@ -52,7 +52,7 @@ Cette première évolution doit permettre de transformer cette base en projet p�
 
 ## REQ-001 — Identifier clairement les composants
 
-Le projet doit disposer d'une vision claire du rôle de chaque composant :
+La documentation doit donner une vision claire du rôle de chaque composant observé dans la référence et de sa pertinence éventuelle pour notre projet :
 
 * service discovery ;
 * API Gateway ;
@@ -61,13 +61,13 @@ Le projet doit disposer d'une vision claire du rôle de chaque composant :
 * EBank Bot ;
 * applications frontend.
 
-Chaque composant doit avoir une responsabilité clairement identifiée.
+Pour chaque composant, distinguer sa responsabilité observée de toute décision de le conserver, fusionner, remplacer ou supprimer dans notre architecture cible. La présence d'un composant dans la référence ne rend pas sa conservation obligatoire.
 
 ---
 
 ## REQ-002 — Formaliser les flux principaux
 
-Les flux suivants doivent être documentés :
+Les flux suivants doivent être documentés comme flux observés ou décrits dans la référence pédagogique. Ils ne constituent pas automatiquement les flux cibles de notre projet.
 
 ### Flux frontend
 
@@ -113,23 +113,23 @@ Business Service
 
 ## REQ-003 — Distinguer les modes de communication
 
-Le projet doit permettre de comprendre et de distinguer clairement :
+Le projet doit permettre de comprendre et de distinguer clairement, dans l'architecture observée et dans les décisions futures lorsque pertinentes :
 
 * communication REST synchrone ;
 * communication Feign entre microservices ;
 * communication MCP entre un client AI et les capacités exposées par les services.
 
-Kafka sera introduit ultérieurement pour étudier la communication événementielle asynchrone.
+La communication événementielle, notamment Kafka, peut être étudiée dans une évolution dédiée si un besoin métier/architectural et une valeur pédagogique le justifient. Son introduction n'est pas un engagement automatique.
 
 ---
 
 # 4. Objectifs techniques
 
-## REQ-004 — Conserver une architecture simple
+## REQ-004 — Conserver une architecture simple dans l'évolution actuelle
 
 L'architecture initiale doit rester volontairement simple.
 
-Ne pas introduire prématurément :
+Dans cette première évolution documentaire, ne pas implémenter ni introduire :
 
 * Kafka ;
 * Redis ;
@@ -142,13 +142,13 @@ Ne pas introduire prématurément :
 * Prometheus ;
 * Grafana.
 
-Ces technologies appartiennent aux évolutions futures du projet.
+Ces technologies et capacités ne sont ni requises ni exclues de façon absolue pour toute la durée du projet. Leur pertinence sera évaluée dans une évolution distincte, à partir d'un besoin démontré, et non selon une roadmap d'adoption automatique.
 
 ---
 
 ## REQ-005 — Préparer les évolutions futures
 
-L'architecture et la documentation doivent permettre d'introduire progressivement :
+La documentation peut identifier des domaines d'apprentissage possibles, sans prescrire l'architecture cible ni garantir l'adoption de chaque technologie :
 
 ```text
 Security
@@ -178,7 +178,7 @@ Helm
 CI/CD
 ```
 
-Chaque évolution devra être traitée comme une évolution architecturale distincte.
+Chaque sujet retenu devra être traité comme une évolution architecturale distincte et justifiée. L'ordre ou la présence dans cette liste ne vaut pas décision d'architecture.
 
 ---
 
@@ -186,7 +186,7 @@ Chaque évolution devra être traitée comme une évolution architecturale disti
 
 ## REQ-006 — Documenter les responsabilités
 
-Pour chaque composant important, identifier :
+Pour chaque composant observé dans la référence et chaque composant retenu dans notre architecture, identifier séparément :
 
 * responsabilité ;
 * dépendances ;
@@ -201,15 +201,14 @@ Pour chaque composant important, identifier :
 
 ## REQ-007 — Identifier les choix architecturaux
 
-Pour les choix importants, documenter :
+Pour chaque choix important de NOTRE architecture, documenter :
 
 * problème rencontré ;
-* solution choisie ;
-* raison du choix ;
+* solution choisie et raison du choix, ou alternatives/critères et état « à décider » tant qu'aucun choix n'est validé ;
 * alternatives possibles ;
 * compromis.
 
-Exemples :
+L'analyse de la référence peut éclairer ces décisions, sans les prédéterminer. Exemples :
 
 * pourquoi Gateway ?
 * pourquoi Eureka ?
@@ -226,7 +225,7 @@ Exemples :
 
 Aucune technologie ne doit être ajoutée uniquement pour être présente dans le projet.
 
-Chaque technologie doit répondre à un problème ou à un objectif pédagogique clairement identifié.
+Chaque technologie retenue dans notre architecture doit répondre à un problème ou à un objectif pédagogique clairement identifié.
 
 ---
 
@@ -244,7 +243,7 @@ Le projet doit privilégier :
 
 * abstractions inutiles ;
 * design patterns artificiels ;
-* microservices artificiels ;
+* microservices artificiels ou séparation de services héritée uniquement par fidélité à la référence ;
 * couches inutiles ;
 * technologies sans cas d'utilisation.
 
@@ -355,10 +354,10 @@ Cette première évolution sera considérée comme correctement formalisée lors
 
 ### Architecture
 
-* les composants principaux sont identifiés ;
-* leurs responsabilités sont documentées ;
-* les flux principaux sont compris ;
-* les communications REST / Feign / MCP sont distinguées.
+* les composants principaux observés dans le dépôt de référence sont identifiés et leurs responsabilités observées sont documentées ;
+* les flux de référence sont compris et différenciés des flux éventuellement choisis pour notre architecture ;
+* les communications REST / Feign / MCP sont distinguées ;
+* la référence est analysée comme source d'inspiration et non comme blueprint architectural ; les choix de conserver, fusionner, remplacer ou supprimer ses composants ne sont pas présumés.
 
 ### Documentation
 
@@ -367,7 +366,7 @@ Les documents suivants pourront être produits à partir de ces requirements :
 ```text
 PROJECT-CONTEXT.md
 requirements.md
-specification.md
+openspec/changes/<change>/specs/<capability>/spec.md
 design.md
 tasks.md
 ```
@@ -388,7 +387,7 @@ Aucune technologie avancée supplémentaire n'est introduite dans cette premièr
 
 # 11. Hors périmètre
 
-Les éléments suivants sont explicitement hors périmètre de cette première évolution :
+Les éléments suivants sont hors périmètre d'implémentation de cette première évolution documentaire (cela ne préjuge pas de décisions futures justifiées) :
 
 * implémentation Kafka ;
 * Keycloak ;
@@ -410,6 +409,36 @@ Ils seront traités dans des évolutions ultérieures.
 ---
 
 # 12. Principe directeur
+
+## Référence pédagogique et liberté de conception
+
+Le repository Youssfi est une référence pédagogique et métier, pas un blueprint
+ni une architecture cible obligatoire. La démarche est :
+
+```text
+comprendre l'idée métier et l'architecture observée
+    ↓
+analyser choix, avantages, limites, risques et compromis
+    ↓
+comparer avec des alternatives pertinentes
+    ↓
+concevoir et justifier NOTRE architecture
+```
+
+Notre architecture peut conserver, fusionner, ajouter, remplacer ou supprimer
+des services et des frontends, et choisir des communications différentes, si
+cela répond mieux aux exigences fonctionnelles et non fonctionnelles. Aucune
+technologie ou topologie n'est retenue au seul motif qu'elle apparaît dans la
+référence ou dans une roadmap.
+
+Pour chaque élément important de la documentation, séparer :
+
+1. **Architecture observée** — faits provenant de la référence, explicitement attribués.
+2. **Analyse** — déductions, limites, risques, alternatives et compromis.
+3. **Architecture cible de notre projet** — décisions prises par nous, ou point « à décider » lorsqu'aucune décision n'est encore validée.
+
+Les faits, déductions, questions ouvertes et décisions doivent rester
+identifiables et ne pas être confondus.
 
 Le projet doit permettre à l'utilisateur de comprendre et défendre chaque décision technique.
 

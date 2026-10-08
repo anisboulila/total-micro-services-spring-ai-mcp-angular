@@ -1,14 +1,22 @@
 # Tasks — Project Foundation & Architecture Baseline
 
+> Règle de conception applicable à toutes les tâches de ce change : décrire
+> séparément l'architecture observée dans la référence, son analyse, et
+> l'architecture cible de notre projet. La référence n'impose ni ses services,
+> ni ses frontends, ni ses protocoles; toute décision cible doit être justifiée
+> par les exigences et les critères System Design. Cette clarification ne marque
+> aucune tâche 2.x à 5.x comme exécutée.
+
 ## 1. Établir les sources et niveaux de preuve
 
-- [ ] 1.1 Confirmer le périmètre local disponible et consigner l'absence de code applicatif, de POMs Maven et de projets Angular dans le workspace analysé.
-- [ ] 1.2 Identifier la révision du dépôt Youssfi utilisée comme référence et conserver l'attribution des constats à cette référence pédagogique.
-- [ ] 1.3 Pour chaque affirmation d'architecture, vérifier qu'elle est marquée comme fait vérifié, déduction ou point à confirmer.
+- [x] 1.1 Confirmer le périmètre local disponible et consigner l'absence de code applicatif, de POMs Maven et de projets Angular dans le workspace analysé.
+- [x] 1.2 Identifier la révision du dépôt Youssfi utilisée comme référence et conserver l'attribution des constats à cette référence pédagogique.
+- [x] 1.3 Pour chaque affirmation d'architecture, vérifier qu'elle est marquée comme fait vérifié, déduction ou point à confirmer.
+- [x] 1.4 Établir la règle durable selon laquelle le dépôt Youssfi est une référence pédagogique et métier, non un blueprint de l'architecture cible.
 
 ## 2. Formaliser l'architecture et les flux
 
-- [ ] 2.1 Documenter les responsabilités, technologies, dépendances, données et communications des cinq services et des deux frontends.
+- [ ] 2.1 Documenter les responsabilités, technologies, dépendances, données et communications des composants observés dans la référence, puis distinguer leur pertinence éventuelle pour notre cible sans présumer de leur conservation.
 - [ ] 2.2 Recenser les routes REST observées et décrire les appels frontend passant par le Gateway.
 - [ ] 2.3 Décrire Eureka et le discovery locator du Gateway, en séparant configuration observée et comportement runtime non vérifié.
 - [ ] 2.4 Décrire EBank → Feign → REST Customer, incluant le circuit breaker, son fallback et le risque associé à la création de comptes.

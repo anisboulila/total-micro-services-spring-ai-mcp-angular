@@ -52,17 +52,38 @@ https://github.com/mohamedYoussfi/totale-micro-services-spring-ai-mcp-angular-te
 
 IMPORTANT :
 
-Le repository ne doit PAS être simplement cloné puis considéré comme le projet final.
+Le repository est une **source d'inspiration métier et pédagogique**, pas un
+blueprint architectural ni l'architecture cible obligatoire du projet.
 
 Il sert de :
 
 * base d'apprentissage ;
 * support de reverse engineering ;
 * source d'inspiration ;
-* base pour reconstruire progressivement une architecture maîtrisée ;
+* point de comparaison pour concevoir progressivement NOTRE architecture ;
 * support pour comprendre Spring AI et MCP.
 
-Les fonctionnalités et technologies absentes du repository seront ajoutées progressivement.
+L'analyse doit comprendre l'idée métier et les choix observés, en identifier les
+avantages, limites, risques et compromis, puis comparer des alternatives avant
+toute décision sur notre architecture. Les fonctionnalités ou technologies
+absentes ne sont pas ajoutées automatiquement.
+
+Notre architecture peut conserver, fusionner, ajouter, remplacer ou supprimer
+des composants de la référence — services comme frontends — et choisir d'autres
+communications si les exigences fonctionnelles et non fonctionnelles le
+justifient. La simplicité, la maintenabilité, l'évolutivité, la valeur
+pédagogique et la capacité à défendre les décisions en entretien guident les
+choix, jamais la fidélité à la référence.
+
+Dans toute analyse, distinguer :
+
+1. **Architecture observée** : faits attribués à la référence pédagogique.
+2. **Analyse** : déductions, limites, risques, compromis et alternatives.
+3. **Architecture cible de notre projet** : décisions prises par nous ou point
+   « à décider » tant qu'aucune décision n'est validée.
+
+Ne jamais transformer une déduction en fait runtime vérifié, ni un composant
+observé en décision d'architecture cible.
 
 ---
 
@@ -92,9 +113,15 @@ L'objectif n'est pas de devenir Frontend Developer.
 
 ---
 
-# 4. Architecture actuelle du repository
+# 4. Architecture observée dans le repository de référence (pas la cible du projet)
 
-Architecture actuellement identifiée :
+Les composants et flux de cette section décrivent le dépôt Youssfi comme observé
+dans le contexte de référence. Ils ne constituent pas une architecture locale
+vérifiée ni une liste de composants à conserver. Le workspace de notre projet
+doit être analysé séparément; toute cible doit être décidée à partir de ses
+exigences et d'une analyse System Design.
+
+Architecture de référence observée à haut niveau :
 
 ```text
                         Angular
@@ -140,7 +167,12 @@ Architecture actuellement identifiée :
 
 ---
 
-# 5. Modules actuels
+# 5. Modules présents dans la référence pédagogique
+
+Les composants ci-dessous décrivent la référence Youssfi, et non un engagement
+sur les modules de notre application cible. Leur responsabilité observée sert à
+l'analyse; la conservation, la fusion, le remplacement ou la suppression de
+chaque frontière restent des décisions à justifier pour notre projet.
 
 ## 5.1 discovery-service
 
@@ -328,7 +360,8 @@ MCP Server
 Business Service
 ```
 
-Ce module deviendra progressivement le cœur AI du projet.
+Dans la référence, ce module porte le parcours conversationnel décrit. Le rôle
+d'un composant AI équivalent dans notre cible reste à décider selon les besoins.
 
 ---
 
@@ -357,14 +390,15 @@ Deuxième application frontend Angular présente dans le repository.
 Même principe :
 
 * comprendre son rôle ;
-* conserver uniquement ce qui est utile ;
+* évaluer séparément sa valeur pour notre projet ;
+* pouvoir le conserver, le fusionner, le remplacer ou ne pas le retenir ;
 * éviter de multiplier inutilement les applications frontend.
 
 ---
 
 # 6. Technologies actuellement présentes
 
-Le repository actuel utilise notamment :
+Le repository Youssfi de référence utilise notamment :
 
 * Java 21
 * Spring Boot 3.5.x
@@ -385,93 +419,42 @@ Le repository actuel utilise notamment :
 * Discord
 * Angular
 
-IMPORTANT :
+IMPORTANT — état de la référence, pas de l'application locale :
 
-H2 est actuellement utilisé.
+H2 est utilisé dans la référence observée.
 
-PostgreSQL n'est pas encore la base principale du projet.
+Cela ne détermine pas le stockage cible de notre projet.
 
-Kafka, Redis, Keycloak, Kubernetes, Helm, observabilité avancée et RAG seront introduits progressivement.
+Kafka, Redis, Keycloak, Kubernetes, Helm, observabilité avancée et RAG sont des
+sujets possibles de futures évolutions; ils ne seront retenus que si une
+évolution les justifie.
 
 ---
 
-# 7. Architecture cible progressive
+# 7. Domaines d'architecture à étudier (non prescriptifs)
 
-L'architecture cible doit évoluer progressivement vers :
+La liste et le diagramme précédemment présentés comme une « architecture cible »
+ne valent pas décision de construire cette topologie. Les sujets ci-dessous
+constituent des domaines possibles d'étude; aucune technologie, aucun service
+ni ordre d'adoption n'est obligatoire. Pour chaque évolution, concevoir la
+solution adaptée au besoin au lieu d'assembler automatiquement ces composants.
+
+Une conception future peut, après analyse :
 
 ```text
-                           Angular
-                              |
-                              v
-                       API Gateway
-                              |
-                       Authentication
-                              |
-                         Keycloak
-                              |
-                 +------------+------------+
-                 |                         |
-                 v                         v
-          Customer Service          EBank Service
-                 |                         |
-                 v                         v
-            PostgreSQL                PostgreSQL
-                 |                         |
-                 +------------+------------+
-                              |
-                            Kafka
-                              |
-                 +------------+------------+
-                 |            |            |
-                 v            v            v
-              Consumer     Consumer      ...
-
-                             
-                         Redis
-                    (si vrai besoin)
-
-
-                       AI Agent
-                          |
-             +------------+------------+
-             |                         |
-             v                         v
-          MCP Client                  RAG
-             |                         |
-             v                         v
-        MCP Servers                pgvector
-             |
-             v
-       Business Services
-
-
-                 Observability
-                       |
-          +------------+-------------+
-          |            |             |
-        Logs        Metrics        Traces
-          |            |             |
-          +------------+-------------+
-                       |
-                 OpenTelemetry
-                       |
-              Prometheus / Grafana
-
-
-                 Docker
-                    |
-                 Kubernetes
-                    |
-                   Helm
-                    |
-                  CI/CD
+    exigences métier / fonctionnelles / non fonctionnelles
+                         ↓
+              analyse System Design
+                         ↓
+       décisions d'architecture justifiées et simples
 ```
 
-Cette architecture est une **cible pédagogique**, pas l'état actuel du projet.
+Les domaines d'apprentissage évoqués ailleurs dans ce contexte ne sont pas un
+engagement d'adoption et doivent être sélectionnés au cas par cas.
 
 ---
 
-# 8. Technologies à introduire progressivement
+# 8. Technologies et sujets à évaluer au besoin
 
 ## Sécurité
 
@@ -880,7 +863,14 @@ Ne pas avancer automatiquement vers plusieurs grosses fonctionnalités.
 
 ---
 
-# 19. Roadmap
+# 19. Roadmap pédagogique indicative
+
+Cette roadmap organise des sujets d'apprentissage, pas une séquence obligatoire
+de technologies ni un engagement à reproduire le repository de référence.
+L'ordre, le périmètre et la pertinence des phases peuvent changer après analyse
+du besoin métier, des exigences fonctionnelles/non fonctionnelles et des
+compromis. Une technologie peut être reportée ou écartée; un service peut être
+fusionné, remplacé ou supprimé si cela simplifie une architecture suffisante.
 
 ## Phase 0 — Reverse Engineering
 
@@ -892,8 +882,9 @@ Ne pas avancer automatiquement vers plusieurs grosses fonctionnalités.
 
 ## Phase 1 — Fondation
 
-* nettoyer/comprendre le socle ;
-* stabiliser les services ;
+* inventorier le contenu local et le distinguer de la référence ;
+* comprendre et analyser le socle de référence ;
+* décider, à partir des exigences, du périmètre et des frontières à construire ;
 * documentation initiale ;
 * System Design de départ.
 
@@ -1101,15 +1092,15 @@ Privilégier :
 
 # 21. État actuel
 
-## Déjà analysé
+## Déjà analysé — référence pédagogique
 
-Repository de référence :
+Repository de référence (distinct du code local) :
 
 ```text
 totale-micro-services-spring-ai-mcp-angular-telegram-discord
 ```
 
-Architecture actuelle comprise à haut niveau :
+Architecture observée dans la référence comprise à haut niveau :
 
 ```text
 Angular
@@ -1211,7 +1202,9 @@ Puis première task d'implémentation.
 
 # 24. Règle absolue du projet
 
-Ne jamais introduire une technologie uniquement pour pouvoir dire qu'elle a été utilisée.
+Ne jamais retenir une technologie ou un composant uniquement parce qu'il figure
+dans le repository Youssfi, dans ce document ou dans une roadmap. La référence
+est un support d'analyse, pas le blueprint de notre architecture.
 
 Pour chaque technologie :
 
@@ -1234,6 +1227,9 @@ Explication entretien
 ```
 
 L'objectif final est que l'utilisateur puisse expliquer et défendre chaque choix technique.
+
+Pour chaque évolution d'architecture, séparer explicitement l'architecture
+observée, son analyse et l'architecture cible décidée pour notre projet.
 
 ---
 

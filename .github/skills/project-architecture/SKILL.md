@@ -47,8 +47,19 @@ IMPORTANT:
 * Its architecture and implementation may be studied to understand concepts.
 * Any fact coming from this repository must remain clearly attributable to the reference repository.
 * Do not invent local implementation details from the reference repository.
+* It is a source of business/pedagogical inspiration, NOT the mandatory target architecture or a blueprint to reproduce.
 
 The local project and the reference repository must always be treated as two distinct things.
+
+### Reference analysis versus our target architecture
+
+For architectural work, keep three separate views:
+
+1. **Observed architecture** — what the reference actually implements, with source/revision and evidence.
+2. **Analysis** — benefits, limitations, failure modes, risks, trade-offs and relevant alternatives.
+3. **Our target architecture** — choices made for this project from its business, functional and non-functional requirements; state "undecided" where no choice is validated.
+
+Never treat a reference component as part of our target merely because it exists there. We may retain, merge, add, replace or remove services and frontends, and choose different communication patterns, when justified. The decision criterion is business need + functional/non-functional requirements + System Design + simplicity + maintainability + evolvability + pedagogical/interview value, not fidelity to the reference.
 
 ## 3. Current architecture-first approach
 
@@ -77,6 +88,8 @@ For important architectural decisions, explicitly identify:
 * disadvantages;
 * trade-offs;
 * consequences.
+
+Compare alternatives before deciding. A roadmap or technology list is a set of learning topics, not an adoption commitment. Do not add complexity or technologies merely to make the target appear more modern.
 
 ## 4. Keep the architecture simple
 
@@ -320,5 +333,7 @@ At this stage:
 * no dependency should be added;
 * the reference repository must not be integrated;
 * architectural facts, deductions and uncertainties must remain distinguishable.
+* the reference architecture is documented and analyzed, not adopted as our target by default;
+* the target topology remains a project decision, not a fixed copy of the reference.
 
 Future evolutions will introduce implementation progressively.

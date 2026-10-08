@@ -6,6 +6,20 @@ Décrire la baseline d'architecture et de System Design de la première évoluti
 à partir des documents locaux et de l'exploration du dépôt Youssfi de référence,
 sans assimiler ce dépôt au code local ni l'intégrer au projet.
 
+Le dépôt Youssfi est une source d'inspiration métier et pédagogique, pas un
+blueprint ni une architecture cible obligatoire. La baseline décrit ce qui y est
+observé et en analyse les choix; elle ne décide pas par défaut que ses services,
+frontends, protocoles ou technologies doivent être conservés dans notre cible.
+
+Le workspace local examiné contient `PROJECT-CONTEXT.md`, `requirements.md`,
+`.gitignore`, les règles `.github/skills/`, la configuration `.idea/` et les
+artefacts OpenSpec de ce change. Aucun code applicatif, POM Maven ou projet
+Angular n'a été trouvé dans cet inventaire. Les éléments d'implémentation
+rapportés par la baseline proviennent du dépôt pédagogique
+`mohamedYoussfi/totale-micro-services-spring-ai-mcp-angular-telegram-discord`,
+branche `main`, révision `bf4c7f2750e4c731662e8138023fd8e6b4e4a475`; ils ne
+décrivent pas du code local.
+
 Les formulations relatives à l'implémentation doivent distinguer explicitement :
 
 - **Fait vérifié dans le code de référence** : constaté dans les sources ou
@@ -42,12 +56,14 @@ implémentation intégrée.
   ou point à confirmer
 - **AND** une déduction ne doit pas être présentée comme un comportement testé
 
-### Requirement: Composants, responsabilités et données
+### Requirement: Composants de référence, responsabilités et données
 
-La baseline MUST document les composants discovery-service, gateway-service,
-customer-service, ebank-service, ebank-bot, angular-front et ebank-ang-front,
-leurs responsabilités, leurs technologies vérifiées dans le dépôt de référence,
-leurs dépendances, données détenues et communications entrantes/sortantes.
+La baseline MUST document les composants observés dans la référence
+(`discovery-service`, `gateway-service`, `customer-service`, `ebank-service`,
+`ebank-bot`, `angular-front`, `ebank-ang-front`), leurs responsabilités, leurs
+technologies vérifiées, leurs dépendances, données détenues et communications.
+Elle MUST distinguer cette cartographie de toute décision de conserver ces
+composants dans l'architecture cible du projet.
 
 #### Scenario: Services métier
 
@@ -71,11 +87,15 @@ leurs dépendances, données détenues et communications entrantes/sortantes.
   explicitées
 - **AND** la raison d'être distincte des deux frontends est marquée à confirmer
   lorsque les sources ne la définissent pas
+- **AND** la présence de ces composants dans la référence n'est pas utilisée
+  comme preuve qu'ils sont requis dans la cible du projet
 
 ### Requirement: Interfaces REST et communications inter-services
 
-La baseline MUST distinguer les routes REST observées, le routage Gateway et
-l'appel synchrone EBank vers Customer via Feign/HTTP.
+La baseline MUST distinguer les routes REST observées dans la référence, le
+routage Gateway et l'appel synchrone EBank vers Customer via Feign/HTTP. Ces
+flux MUST être documentés comme architecture observée, et non comme décision
+implicite sur les flux cibles du projet.
 
 #### Scenario: API REST métier
 
@@ -202,8 +222,12 @@ de Spring AI dans le bot, tout en les distinguant des APIs REST ordinaires.
 La baseline MUST inclure un System Design substantiel couvrant responsabilités,
 frontières, flux, couplages, données, disponibilité, résilience, performance,
 scalabilité, sécurité, observabilité, fragilités et compromis. Les choix
-importants MUST expliquer le problème, le choix observé, les alternatives et
-les compromis, sans proposer l'implémentation de technologies hors périmètre.
+importants de la référence MUST expliquer le besoin auquel ils répondent, les
+alternatives et les compromis. Toute décision concernant l'architecture cible
+du projet MUST être explicitement justifiée par les exigences et critères du
+projet; si elle n'est pas prise dans cette évolution, elle MUST rester marquée
+comme indécise. La baseline MUST NOT assimiler un choix observé à un choix déjà
+validé pour le projet.
 
 #### Scenario: Analyse de disponibilité et de scalabilité
 
@@ -236,6 +260,20 @@ les compromis, sans proposer l'implémentation de technologies hors périmètre.
 - **AND** Kafka demeure une évolution future mentionnée par les requirements et
   ne devient ni une dépendance ni un flux de cette baseline
 
+#### Scenario: Décider de notre architecture indépendamment de la référence
+
+- **WHEN** un composant, frontend, protocole ou choix technologique de la
+  référence est évalué pour notre projet
+- **THEN** la baseline sépare l'architecture observée, son analyse et la cible
+  de notre projet
+- **AND** conserver, fusionner, ajouter, remplacer ou supprimer un composant
+  reste possible si cela est justifié par le besoin métier, les exigences
+  fonctionnelles/non fonctionnelles, le System Design, la simplicité, la
+  maintenabilité, l'évolutivité et la valeur pédagogique/interview
+- **AND** aucun microservice, frontend, mode de communication ou technologie
+  n'est obligatoire du seul fait de sa présence dans la référence ou une roadmap
+- **AND** les décisions non prises restent explicitement « à décider »
+
 ### Requirement: Respect du périmètre documentaire
 
 Cette évolution MUST rester une formalisation documentaire de l'architecture
@@ -252,3 +290,5 @@ ou intégrer le dépôt de référence, ou ajouter une technologie hors périmè
 - **AND** aucun test runtime n'est requis en l'absence de changement de code
 - **AND** les limites de preuve et questions ouvertes restent documentées au lieu
   d'être résolues par supposition
+- **AND** le dépôt de référence reste une source d'inspiration et n'est ni copié,
+  cloné, intégré ni transformé en architecture cible automatique

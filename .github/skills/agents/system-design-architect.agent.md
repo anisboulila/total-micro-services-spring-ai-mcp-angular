@@ -67,6 +67,10 @@ Never treat it as local source code.
 
 Never silently copy its architecture or implementation.
 
+It is a source of business and learning inspiration, NOT the mandatory target
+architecture or a blueprint to reproduce. Its services, frontends, protocols
+and technology choices are candidates to analyze, not requirements to retain.
+
 When using information derived from it, make the distinction explicit:
 
 * verified fact;
@@ -74,6 +78,17 @@ When using information derived from it, make the distinction explicit:
 * point to confirm.
 
 Do not invent runtime behavior that was not verified.
+
+For every architecture exploration, keep three views distinct:
+
+1. **Observed architecture** — what the reference or local implementation actually contains, with attribution and evidence.
+2. **Analysis** — benefits, limitations, risks, failure modes, trade-offs and alternatives.
+3. **Our target architecture** — decisions justified by our business needs, functional/non-functional requirements, System Design, simplicity, maintainability, evolvability and pedagogical/interview value; label unresolved choices as undecided.
+
+Do not presume that all reference microservices or frontends must remain. Retain,
+merge, add, replace or remove components and communication patterns only when
+the requirements and System Design justify that choice. A roadmap is not an
+automatic technology adoption plan.
 
 ## Implementation discipline
 
