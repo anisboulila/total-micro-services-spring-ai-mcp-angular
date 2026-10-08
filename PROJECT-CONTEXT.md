@@ -1245,6 +1245,31 @@ d'implémentation runtime. Les prochaines décisions d'architecture doivent
 partir des exigences du projet et de la comparaison des options, pas d'une
 reproduction de la référence.
 
+## Évolution en cours — baseline des exigences métier
+
+La change `define-business-requirements-and-target-system-design` couvre
+uniquement **Étape 1 — Requirements / Exigences**. Elle établit des besoins
+candidats pour notre reconstruction de zéro à partir de `PROJECT-CONTEXT.md`,
+de la change de baseline terminée et des sources Youssfi au commit
+`bf4c7f2750e4c731662e8138023fd8e6b4e4a475`.
+
+Les opérations Customer (consulter la liste, consulter par identifiant, créer),
+les opérations BankAccount correspondantes et les interactions de chat sont
+**observées dans la référence**. Elles sont consignées comme cas d’usage
+candidats; leur inclusion au produit, les rôles autorisés et les règles métier
+restent **à confirmer**. Les besoins de protection des informations, de
+justesse des associations, d’utilisabilité et de qualité de service sont des
+éléments **déduits / à confirmer**, sans objectifs numériques définis.
+
+La baseline des exigences ne choisit pas l’architecture cible et ne commence
+pas le System Design, qui reste une phase ultérieure et hors périmètre de cette
+change. L’état des tâches se trouve dans
+`openspec/changes/define-business-requirements-and-target-system-design/tasks.md`;
+les exigences sont dans
+`openspec/changes/define-business-requirements-and-target-system-design/specs/business-requirements/spec.md`.
+Les questions métier non résolues doivent rester identifiées comme **à
+confirmer** et être examinées avant tout System Design.
+
 ---
 
 # 25. Règle absolue du projet

@@ -161,3 +161,91 @@ observabilité de bout en bout.
 **Exemple provenant de la référence**  
 Les outils MCP incluent des opérations de création; leur protection effective
 et l'exposition des endpoints de gestion restent à confirmer.
+
+## Entretien — Baseline des exigences métier
+
+> Cette section traite uniquement de l’Étape 1 — Requirements / Exigences.
+> Elle ne valide pas le périmètre produit et ne prend aucune décision de
+> System Design.
+
+## Comment transformer une référence technique en exigences produit?
+
+**Réponse courte**
+Séparer les capacités observées dans la référence des besoins déduits et faire
+confirmer le périmètre par le propriétaire du produit.
+
+**Explication**
+Un endpoint ou une interface prouve qu’une capacité existe dans le code de
+référence; cela ne prouve ni que notre produit en a besoin, ni qui est autorisé
+à l’utiliser, ni quelles règles métier doivent s’appliquer.
+
+**Piège éventuel**
+Traiter la référence pédagogique comme une spécification validée ou recopier
+automatiquement ses fonctionnalités.
+
+**Exemple provenant de la référence Youssfi**
+Customer permet de lister, rechercher et créer des clients. Ces capacités sont
+des preuves pour UC-01 à UC-03, mais leur inclusion dans notre produit et les
+règles de création restent à confirmer.
+
+## À quoi servent les niveaux OBSERVÉ, DÉDUIT, DÉCIDÉ et À CONFIRMER?
+
+**Réponse courte**
+Ils rendent visible la provenance d’une affirmation et empêchent de confondre
+un fait, un besoin candidat, un choix explicite et une question non résolue.
+
+**Explication**
+Une capacité directement présente dans le code est **OBSERVÉE**. Un besoin
+logiquement inféré est **DÉDUIT**; il peut rester **À CONFIRMER** tant qu’un
+responsable métier ne l’a pas validé. **DÉCIDÉ** est réservé aux choix
+explicitement formulés pour notre projet.
+
+**Piège éventuel**
+Présenter une déduction plausible comme une exigence approuvée ou une décision
+du propriétaire.
+
+**Exemple provenant de la référence Youssfi**
+Le Bot accepte du texte et est configuré avec des outils client/compte; le
+besoin d’un accès conversationnel dans notre produit est seulement candidat et
+reste à confirmer.
+
+## Pourquoi recenser les questions ouvertes dans une baseline?
+
+**Réponse courte**
+Pour rendre explicites les informations nécessaires à la validation produit
+et éviter de combler les lacunes par des hypothèses cachées.
+
+**Explication**
+Les critères d’acceptation et les règles métier doivent être assez précis pour
+être révisés. En leur absence, il faut consigner l’incertitude, sans fabriquer
+de seuils de qualité ni anticiper les solutions techniques.
+
+**Piège éventuel**
+Inventer des règles ou des SLO numériques, ou traiter l’absence de réponse
+comme un accord implicite.
+
+**Exemple provenant de la référence Youssfi**
+Le compte contient `balance`, `type` et `customerId`, mais ces champs ne
+déterminent pas à eux seuls la devise, la signification du solde, l’éligibilité
+du client ou les règles de création attendues pour notre produit.
+
+## Pourquoi les exigences ne définissent-elles pas déjà le System Design?
+
+**Réponse courte**
+Les exigences décrivent les besoins et résultats attendus; le System Design
+évalue ensuite des moyens de les satisfaire.
+
+**Explication**
+La baseline peut exprimer des besoins de confidentialité, de disponibilité ou
+de temps de réponse sans choisir une architecture, une technologie ni un
+mécanisme d’implémentation. Le System Design cible est une phase ultérieure,
+hors périmètre de cette évolution.
+
+**Piège éventuel**
+Transformer un besoin qualité en prescription technique avant d’avoir confirmé
+le besoin et évalué les alternatives.
+
+**Exemple provenant de la référence Youssfi**
+L’existence d’un Gateway ou de deux interfaces dans la référence n’établit pas
+que notre projet doit les reprendre; ces choix ne relèvent pas de la baseline
+Requirements.
