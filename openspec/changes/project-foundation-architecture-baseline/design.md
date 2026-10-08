@@ -71,89 +71,281 @@ explicites dans la configuration de référence. Aucun composant de ce diagramme
 n'est de ce fait automatiquement retenu dans l'architecture cible de notre
 projet.
 
-## 3. Composants et frontières
+## 3. Composants observés, analyse et pertinence éventuelle
 
-| Composant observé dans la référence | Faits vérifiés dans la référence | Analyse / pertinence pour notre cible |
-|---|---|---|
-| `discovery-service` | Serveur Eureka annoté `@EnableEurekaServer`, port 8761; ne s'enregistre pas lui-même et ne récupère pas de registre selon ses propriétés. | **Analyse** : le registre peut être un point de dépendance du routage dynamique; la haute disponibilité n'est pas démontrée. **À décider pour notre cible** : conserver une découverte dédiée, choisir une autre approche ou ne pas en avoir besoin. |
-| `gateway-service` | Gateway WebFlux, Eureka Client, port 9999; bean `DiscoveryClientRouteDefinitionLocator`; CORS global wildcard. Les routes statiques du YAML sont commentées. | **Analyse** : le Gateway centralise les entrées web observées mais ajoute un intermédiaire. **À décider pour notre cible** : besoin réel d'une entrée dédiée, de ses responsabilités et de sa portée. |
-| `customer-service` | Spring Web, JPA, H2, Eureka Client, Actuator, OpenAPI, MCP Server WebMVC; Customer id/name/email; REST customers. | **Analyse** : responsabilité de données client identifiable dans la référence. **À décider pour notre cible** : frontière métier autonome, fusion ou autre organisation selon besoins. |
-| `ebank-service` | Spring Web, JPA, H2, Eureka Client, Feign, Resilience4j, MCP Server WebMVC; BankAccount et routes accounts. | **Analyse** : propriétaire des comptes dans la référence; `customerId` est une référence inter-service plutôt qu'une association JPA, avec couplage synchrone à Customer. **À décider pour notre cible** : frontière et communication adéquates. |
-| `ebank-bot` | Spring Web, Spring AI OpenAI, client MCP, Eureka Client, Actuator, Telegram et Discord; API chat sur port 8058. | **Analyse** : adaptateur AI dépendant d'un LLM, des canaux et des outils. La persistance de mémoire n'est pas établie. **À décider pour notre cible** : rôle, frontières et canaux réellement requis. |
-| `angular-front` | Angular 21.1; vues comptes et bot; appels via Gateway; utilise `/chatStream` dans le code observé. | **Analyse** : client web métier/conversationnel dans la référence. L'URL locale est codée en dur. **À décider pour notre cible** : conserver ou remplacer le frontend et ses responsabilités. |
-| `ebank-ang-front` | Angular 21.1; vues comptes et bot; appels via Gateway. Le parcours nommé streaming appelle `/chat`, pas `/chatStream`. | **Analyse** : fonctions proches du premier frontend, mais la raison de la duplication reste à confirmer. **À décider pour notre cible** : conserver, fusionner ou supprimer selon besoins. |
+Cette cartographie porte sur les sept composants nommés dans les requirements
+et observés dans le dépôt pédagogique. Les faits techniques ci-dessous sont
+vérifiés dans les POMs, manifestes, sources et configurations consultés à la
+révision indiquée en section 1. Les analyses sont des déductions et non des
+résultats de tests runtime. Pour chaque composant, la pertinence pour notre
+projet reste à évaluer; aucune décision de conservation n'est prise ici.
 
-### Dépendances Maven notables — faits vérifiés dans les POMs de référence
+### 3.1 `discovery-service`
 
-- Spring Boot parent 3.5.10 et Java 21 dans les POMs consultés.
-- Spring Cloud BOM 2025.0.1 dans les services concernés.
-- Spring AI BOM 1.1.2 pour les modules MCP et bot.
-- Customer : Web, Data JPA, H2, Eureka Client, Config Client, Actuator,
-  OpenAPI, MCP Server WebMVC, tests et Lombok.
-- EBank : mêmes fondations métier, plus OpenFeign et
-  `spring-cloud-starter-circuitbreaker-resilience4j`.
-- Gateway : Gateway Server WebFlux, Eureka Client, Actuator, tests WebFlux.
-- Bot : Web, Spring AI OpenAI, MCP Client, Eureka Client, Actuator, OpenAPI,
-  starter Discord et Telegram.
-- Discovery : Eureka Server, Actuator et tests.
-- Le starter Config est présent dans Customer, EBank et Bot, mais le client
-  Config est désactivé (`spring.cloud.config.enabled=false`) dans les propriétés
-  consultées; aucun Config Server n'a été identifié.
-- Les Angulars déclarent Angular 21.1, RxJS, Bootstrap/ngx-markdown et scripts
-  `start`, `build`, `test`.
+- **Observé dans Youssfi — responsabilité et technologies (fait vérifié)** :
+  application Spring Boot, Java 21, Spring Cloud 2025.0.1, Eureka Server,
+  Actuator. Elle active Eureka Server et écoute sur le port 8761; sa
+  configuration désactive son propre enregistrement et la récupération du
+  registre.
+- **Dépendances et communications (fait vérifié)** : dépend d'Eureka Server et
+  Actuator; les autres services qui déclarent Eureka Client/configuration de
+  discovery peuvent s'enregistrer ou consulter le registre. La réussite de ces
+  interactions n'a pas été testée.
+- **Données** : **fait vérifié** — aucun stockage métier propre n'est identifié
+  dans le code consulté. **Déduction à partir du rôle Eureka** — le registre
+  traite des métadonnées d'instances; la persistance ou la configuration de
+  cluster n'est pas établie par les sources consultées.
+- **Rôle dans les flux** : fournit la découverte utilisée par le locator du
+  Gateway et le nom de service du client Feign. Les URL MCP du bot, elles, sont
+  configurées en localhost et n'utilisent pas cette résolution.
+- **Analyse / apprentissage** : illustre la différence entre adresse fixe et
+  résolution par nom de service. Un registre dédié ajoute une dépendance et un
+  point opérationnel; aucune haute disponibilité n'est démontrée.
+- **Pertinence / décision future** : la découverte dynamique peut être utile si
+  notre topologie a des services/instances à localiser. **À décider** si nous
+  avons besoin d'un registre dédié, d'une autre forme de découverte ou d'aucun
+  composant de découverte.
 
-Cette liste reflète les POMs/package manifests consultés et ne prétend pas
-décrire l'arbre transitif résolu ou le comportement d'exécution.
+### 3.2 `gateway-service`
+
+- **Observé dans Youssfi — responsabilité et technologies (fait vérifié)** :
+  point d'entrée HTTP visé par les frontends; Java 21, Spring Boot 3.5.10,
+  Spring Cloud Gateway WebFlux, Eureka Client et Actuator; port 9999. La classe
+  déclare un `DiscoveryClientRouteDefinitionLocator`. La configuration YAML
+  présente un CORS wildcard. Les routes statiques proposées sont commentées.
+- **Dépendances et communications (fait vérifié)** : reçoit les requêtes web
+  adressées par les frontends; dépend du mécanisme de découverte déclaré pour
+  générer des routes. Les chemins frontend et l'effet des routes découverts
+  sont décrits séparément en section 4.2; aucun succès de routage runtime n'est
+  affirmé ici.
+- **Données** : aucune donnée métier ou persistance propre au Gateway n'est
+  identifiée dans le code consulté.
+- **Rôle dans les flux** : médiateur HTTP entre clients web et services
+  enregistrés, selon l'intention du code et les URLs côté frontends.
+- **Analyse / apprentissage** : permet d'étudier la centralisation d'entrée et
+  le routage, au prix d'un saut réseau et d'une dépendance additionnelle. CORS
+  contrôle les requêtes cross-origin des navigateurs, mais ne constitue pas une
+  authentification. La configuration effective des routes et sa tolérance aux
+  pannes restent à confirmer.
+- **Pertinence / décision future** : peut être pertinent si le projet a besoin
+  d'une frontière HTTP commune ou de fonctions transverses effectivement
+  requises. **À décider** si un Gateway est nécessaire, quelles responsabilités
+  lui confier et s'il doit s'appuyer sur une découverte dynamique.
+
+### 3.3 `customer-service`
+
+- **Observé dans Youssfi — responsabilité et technologies (fait vérifié)** :
+  API de gestion des clients et serveur MCP. Java 21, Spring Boot 3.5.10,
+  Spring Web MVC, Spring Data JPA/Hibernate, H2, Eureka Client, Actuator,
+  OpenAPI, MCP Server WebMVC; Spring Cloud 2025.0.1 et Spring AI 1.1.2.
+- **Dépendances et communications (fait vérifié)** : reçoit REST sur
+  `/customers` et capacités MCP; dépend de sa base H2 et déclare Eureka Client.
+  Le POM contient le starter Spring Cloud Config, mais la propriété consultée
+  désactive le client Config; aucun Config Server n'a été identifié.
+- **Données (fait vérifié)** : entité Customer avec `id`, `name`, `email`, gérée
+  via JPA; URL datasource `jdbc:h2:mem:customer-db`. Des clients de démonstration
+  sont créés au démarrage. L'état de cette base en mémoire n'est pas une
+  persistance durable entre redémarrages.
+- **Rôle dans les flux** : expose les données clients via REST, répond aux
+  appels EBank via Feign/REST et met ses méthodes annotées `@McpTool` à
+  disposition du client MCP pour lecture et création de clients.
+- **Analyse / apprentissage** : illustre une frontière de responsabilité et de
+  données clients, partageable via interfaces sans accès direct à la base par
+  EBank. Une frontière service/base distincte ajoute un coût d'exploitation et
+  ne supprime pas les défaillances réseau.
+- **Pertinence / décision future** : une capacité client est justifiée si elle
+  correspond à un domaine et à un besoin indépendants. **À décider** si elle
+  reste un service autonome, fusionne avec un autre périmètre ou est représentée
+  autrement dans notre application.
+
+### 3.4 `ebank-service`
+
+- **Observé dans Youssfi — responsabilité et technologies (fait vérifié)** :
+  API de comptes bancaires et serveur MCP. Java 21, Spring Boot 3.5.10,
+  Spring Web MVC, Spring Data JPA/Hibernate, H2, Eureka Client, OpenFeign,
+  Resilience4j, Actuator, OpenAPI et MCP Server WebMVC; Spring Cloud 2025.0.1
+  et Spring AI 1.1.2.
+- **Dépendances et communications (fait vérifié)** : reçoit REST et MCP; appelle
+  Customer par un client Feign déclaré avec le nom `customer-service` et HTTP
+  REST; dépend de sa base H2. Le POM comprend Config Client, mais la propriété
+  consultée le désactive; aucun Config Server n'a été identifié.
+- **Données (fait vérifié)** : BankAccount persisté par JPA avec `id`,
+  `createdAt`, `balance`, `type` et `customerId`. Le champ `customer` est
+  `@Transient` et n'est pas une relation JPA persistée. URL H2 :
+  `jdbc:h2:mem:accounts-db`; des comptes de démonstration sont créés au
+  démarrage.
+- **Rôle dans les flux** : possède les comptes; dans certains parcours appelle
+  Customer et expose des opérations de compte par REST et par annotations MCP.
+  Les précisions de routes, circuit breaker et comportements associés sont
+  traitées dans les sections 4.1 et 4.3 (pas redéfinies ici).
+- **Analyse / apprentissage** : illustre une séparation de domaine et l'appel
+  synchrone entre services. Ce choix crée un couplage de disponibilité; le
+  fallback Customer observé soulève un risque de validation métier détaillé en
+  section 4.3. H2 mémoire limite la démonstration de durabilité.
+- **Pertinence / décision future** : un périmètre bancaire dédié peut être utile
+  pour le domaine métier et les exercices de communication distribuée.
+  **À décider** si cette frontière, son stockage et ses interfaces sont adaptés
+  à nos exigences, ou si un regroupement/remplacement est plus simple.
+
+### 3.5 `ebank-bot`
+
+- **Observé dans Youssfi — responsabilité et technologies (fait vérifié)** :
+  adaptateur conversationnel avec API Web et intégration Telegram/Discord.
+  Java 21, Spring Boot 3.5.10, Spring Web, Spring AI OpenAI, MCP Client,
+  Eureka Client, Actuator, OpenAPI, starter Discord et Telegram; port 8058.
+  Le modèle configuré est `gpt-4o`; le ChatClient reçoit un
+  `ToolCallbackProvider` et un `MessageChatMemoryAdvisor`.
+- **Dépendances et communications (fait vérifié)** : reçoit des messages
+  Telegram (long polling), des événements Discord et des requêtes Web; appelle
+  OpenAI et des serveurs MCP via les URL locales configurées
+  `http://localhost:8056/mcp` et `http://localhost:8057/mcp`. Le bot déclare
+  Eureka Client, mais ces destinations MCP ne s'appuient pas sur Eureka.
+- **Données** : aucune entité ou base métier propre au bot n'est identifiée
+  dans les sources consultées. La présence de `ChatMemory` advisor est
+  vérifiée; le stockage et la portée de cette mémoire sont **à confirmer**.
+- **Rôle dans les flux** : adapte les canaux conversationnels et l'API web au
+  ChatClient, qui peut utiliser les capacités MCP disponibles. Cela ne prouve
+  pas que chaque requête appelle systématiquement un outil.
+- **Analyse / apprentissage** : permet d'étudier la séparation canal/
+  orchestration AI/capacités métier et l'intégration d'un LLM. Il ajoute des
+  dépendances externes et des chemins d'échec (fournisseur LLM, plateformes,
+  MCP); les erreurs, timeouts et contrôles d'accès ne sont pas établis ici.
+- **Pertinence / décision future** : une interface conversationnelle vaut la
+  peine si elle répond à un cas d'usage métier ou pédagogique défini.
+  **À décider** si le bot existe comme composant séparé, quels canaux il sert,
+  et si Spring AI/MCP sont utiles aux exigences retenues.
+
+### 3.6 `angular-front`
+
+- **Observé dans Youssfi — responsabilité et technologies (fait vérifié)** :
+  application Angular 21.1 consommant la liste de comptes et l'API du bot;
+  manifestes déclarant Angular, TypeScript, RxJS, Bootstrap et ngx-markdown.
+  Le code consulte les comptes et appelle `/chatStream` pour le parcours de
+  réponse streamée.
+- **Dépendances et communications (fait vérifié)** : utilise `HttpClient` et
+  appelle le Gateway à `localhost:9999` avec les identifiants de service
+  présents dans les chemins. Les URLs de base sont codées dans le code client
+  consulté; le succès du routage n'est pas vérifié.
+- **Données** : modèles/état côté client pour afficher les comptes et les
+  réponses; aucune persistance métier frontend n'est identifiée.
+- **Rôle dans les flux** : interface navigateur du parcours comptes et du chat,
+  en passant par le Gateway.
+- **Analyse / apprentissage** : montre l'intégration HTTP d'une UI dans une
+  architecture distribuée; le codage d'URLs locales lie le client au profil
+  d'exécution observé.
+- **Pertinence / décision future** : à évaluer selon le besoin d'interface
+  navigateur et les objectifs d'apprentissage. **À décider** si ce frontend est
+  conservé, adapté, fusionné avec une autre UI ou remplacé.
+
+### 3.7 `ebank-ang-front`
+
+- **Observé dans Youssfi — responsabilité et technologies (fait vérifié)** :
+  seconde application Angular 21.1, avec des vues de comptes et de bot proches
+  de `angular-front`; manifestes déclarant Angular, TypeScript, RxJS, Bootstrap
+  et ngx-markdown.
+- **Dépendances et communications (fait vérifié)** : utilise `HttpClient` pour
+  appeler le Gateway à `localhost:9999`. Le parcours nommé streaming appelle
+  `/chat`, et non le endpoint `/chatStream` décrit dans le bot.
+- **Données** : modèle/état de compte et réponse conversationnelle utilisés pour
+  l'affichage; aucune persistance métier frontend n'est identifiée.
+- **Rôle dans les flux** : deuxième client navigateur des APIs EBank et du bot.
+  Les sources consultées ne définissent pas son rôle distinct de la première UI.
+- **Analyse / apprentissage** : permet de comparer des clients semblables et met
+  en évidence une divergence de chemin pour le streaming; la raison de la
+  duplication et le comportement exact à l'exécution restent à confirmer.
+- **Pertinence / décision future** : **à décider** si le projet a besoin d'une
+  ou de plusieurs interfaces web; cette application peut être conservée,
+  fusionnée, remplacée ou écartée selon la valeur fonctionnelle et pédagogique.
+
+### Conventions et limites transverses
+
+- **Faits vérifiés dans les manifests de référence** : les POMs consultés
+  utilisent Java 21 et Spring Boot 3.5.10; les modules concernés importent
+  Spring Cloud BOM 2025.0.1 et les composants Spring AI BOM 1.1.2. Les deux
+  frontends déclarent Angular 21.1 et scripts `start`, `build`, `test`.
+- Les listes de dépendances décrivent les dépendances directes consultées; elles
+  ne prétendent pas reproduire l'arbre transitif résolu ni le comportement
+  runtime.
+- **À confirmer** : les sources du projet local n'étant pas présentes, aucune
+  correspondance entre ces composants de référence et les composants de notre
+  application n'est établie.
+- **Décision future à prendre** : évaluer chaque responsabilité et frontière à
+  partir du besoin métier, des exigences fonctionnelles/non fonctionnelles, des
+  communications requises, des risques et coûts opérationnels, de la simplicité,
+  de la maintenabilité, de l'évolutivité et de la valeur pédagogique. Aucun des
+  sept composants n'est automatiquement conservé; des services peuvent être
+  fusionnés, remplacés ou supprimés, et d'autres composants ne doivent être
+  créés que si une séparation est justifiée.
 
 ## 4. Interfaces et flux
 
-### 4.1 API REST — faits vérifiés dans les contrôleurs de référence
+### 4.1 API REST — routes observées dans les contrôleurs de référence
 
-| Service | Méthode et chemin | Utilisation observée |
-|---|---|---|
-| Customer | `GET /customers` | Liste les clients. |
-| Customer | `GET /customers/{id}` | Retourne un client par identifiant; utilisé par Feign. |
-| Customer | `POST /customers` | Crée un client. |
-| EBank | `GET /accounts` | Liste les comptes sans enrichissement Customer dans le chemin consulté. |
-| EBank | `GET /accounts/{id}` | Retourne un compte et appelle Customer pour renseigner le client. |
-| EBank | `POST /accounts` | Appelle Customer puis persiste le compte. |
-| Bot | `GET /chat?query=...` | Appel synchrone au ChatClient. |
-| Bot | `GET /chatStream?query=...` | Produit un `Flux<String>` pour la réponse streamée HTTP. |
+Le tableau distingue les routes déclarées dans les contrôleurs de la manière
+dont les frontends les appellent. Les signatures et types ci-dessous sont des
+**faits vérifiés dans le code de référence**; l'exécution et les réponses HTTP
+réelles n'ont pas été testées.
 
-Les routes REST sont observées dans les contrôleurs consultés. Le comportement
-HTTP en erreur, les validations, la pagination et les contrats d'API complets
-ne sont pas décrits ici.
+| Service | Méthode / route | Rôle et entrée vérifiés | Réponse déclarée dans le code | Appelant observé |
+|---|---|---|---|---|
+| Customer | `GET /customers` | Lister les clients; aucune entrée déclarée. | `List<Customer>` (JSON attendu par Spring MVC). | Aucun appel direct depuis les frontends n'a été identifié. |
+| Customer | `GET /customers/{id}` | Rechercher un client par `id` de type `Long`. | `Customer` (JSON attendu par Spring MVC). | Aucun appel direct depuis les frontends n'a été identifié; l'appel interne EBank/Feign est hors du flux frontend et sera détaillé en 2.4. |
+| Customer | `POST /customers` | Créer un client à partir d'un corps `Customer` (`@RequestBody`). | `Customer` renvoyé par le service. | Aucun appel direct depuis les frontends n'a été identifié. |
+| EBank | `GET /accounts` | Lister les comptes; aucune entrée déclarée. | `List<BankAccount>` (JSON attendu par Spring MVC). | Les deux frontends demandent cette liste via Gateway. |
+| EBank | `GET /accounts/{id}` | Lire un compte par `id` de type `String`. | `BankAccount` (JSON attendu par Spring MVC). | Aucun appel direct depuis les frontends n'a été identifié. |
+| EBank | `POST /accounts` | Créer un compte à partir d'un corps `BankAccount` (`@RequestBody`). | `BankAccount` renvoyé par le service. | Aucun appel direct depuis les frontends n'a été identifié. |
+| EBank Bot | `GET /chat?query=...` | Soumettre une requête texte; `query` est un paramètre avec défaut `"Bonjour"`. | `String`, déclaré `text/plain`. | Les deux frontends appellent cette route via Gateway. |
+| EBank Bot | `GET /chatStream?query=...` | Soumettre une requête texte; `query` est un paramètre avec défaut `"Bonjour"`. | `Flux<String>`, déclaré `text/plain`. | `angular-front` appelle cette route via Gateway; aucun appel à cette route n'a été identifié dans `ebank-ang-front`. |
 
-### 4.2 Frontend → Gateway → services — faits, déduction et confirmation
+Les types indiquent le contrat visible dans les signatures de contrôleur, pas
+un schéma JSON complet ni un résultat vérifié sur le réseau. Codes HTTP,
+erreurs, validations, pagination et contraintes des corps ne sont pas établis
+par cette seule liste.
 
-**Faits vérifiés dans les frontends de référence** : appels vers le port Gateway,
-avec les chemins ci-dessous. Les URL ne prouvent pas à elles seules que le
-routage réussit à l'exécution.
+### 4.2 Appels frontend → Gateway → services
 
-```text
-angular-front / ebank-ang-front
-        | GET /EBANK-SERVICE/accounts
-        | GET /EBANK-BOT/chat (et selon le frontend /chatStream)
-        v
-Gateway WebFlux :9999
-        |
-        +-- destination de service via discovery locator (intention/config observée)
-                |
-                +--> EBank Service :8057 --> H2
-                +--> EBank Bot :8058 --> Spring AI
-```
+**Appels observés (faits vérifiés dans les sources Angular)** :
 
-**Vérifié (référence)** : clients HTTP directs vers le port 9999 avec les
-identifiants `EBANK-SERVICE` et `EBANK-BOT`; le bean de discovery locator est
-déclaré. Le YAML présente CORS autorisant toutes les origines, méthodes et
-en-têtes. Les routes statiques sont commentées.
+| Frontend | Opération HTTP côté client | URL/chemin utilisé côté frontend | Route de contrôleur correspondante | Destination logique indiquée par le préfixe |
+|---|---|---|---|---|
+| `angular-front` | `GET` comptes | `http://localhost:9999/EBANK-SERVICE/accounts` | EBank `GET /accounts` | `EBANK-SERVICE` (EBank) |
+| `ebank-ang-front` | `GET` comptes | `http://localhost:9999/EBANK-SERVICE/accounts` | EBank `GET /accounts` | `EBANK-SERVICE` (EBank) |
+| `angular-front` | `GET` chat | `http://localhost:9999/EBANK-BOT/chat?query=...` | Bot `GET /chat?query=...` | `EBANK-BOT` |
+| `angular-front` | `GET` chat avec chemin `chatStream` | `http://localhost:9999/EBANK-BOT/chatStream?query=...` | Bot `GET /chatStream?query=...` | `EBANK-BOT` |
+| `ebank-ang-front` | `GET` chat | `http://localhost:9999/EBANK-BOT/chat?query=...` | Bot `GET /chat?query=...` | `EBANK-BOT` |
+| `ebank-ang-front` | `GET` méthode cliente nommée `askAgentSteam` | `http://localhost:9999/EBANK-BOT/chat?query=...` | Bot `GET /chat?query=...` | `EBANK-BOT` |
 
-**Déduit** : le Gateway centralise les destinations vues par le navigateur et
-permet le routage basé sur le registre plutôt que sur des routes fixes.
+Les valeurs effectives de `query` sont concaténées par le code Angular à partir
+du texte saisi. Les appels observés ciblent directement le port Gateway
+`localhost:9999`; les chemins comportent les identifiants `EBANK-SERVICE` et
+`EBANK-BOT`. Il n'y a pas d'appel frontend direct observé aux routes Customer,
+à `GET /accounts/{id}` ou à `POST /accounts`.
 
-**À confirmer** : routes effectivement produites, normalisation des chemins,
-équilibrage, comportement en perte d'Eureka, et inclusion éventuelle d'autres
-chemins que les requêtes frontend.
+**Gateway — faits vérifiés dans le code/configuration de référence** :
+
+- Le Gateway écoute sur le port `9999`; les frontends utilisent l'adresse
+  `http://localhost:9999`.
+- La classe de démarrage déclare un `DiscoveryClientRouteDefinitionLocator`.
+  Le mécanisme est déclaré pour créer des définitions de routes à partir des
+  services découverts; cela n'établit pas que les routes ont été produites ou
+  qu'une requête a été routée avec succès.
+- Les préfixes `EBANK-SERVICE` et `EBANK-BOT` désignent respectivement les
+  destinations logiques demandées par les URLs Angular. Les chemins finaux
+  transmis aux contrôleurs et les transformations éventuelles ne sont pas
+  validés par un test runtime.
+- Le YAML du Gateway contient des routes statiques `/customers/**` et
+  `/accounts/**` sous forme commentée; elles ne sont donc pas des routes
+  statiques actives dans cette configuration.
+
+**Rôle (déduction)** : le Gateway sert de point d'entrée HTTP commun aux
+frontends observés et de médiateur vers les destinations logiques de service.
+Cette description reflète l'intention exprimée par les URLs et la configuration,
+pas une preuve de fonctionnement en exécution.
+
+**À confirmer** : génération/résolution effective des routes, conservation ou
+suppression du préfixe de service, correspondance exacte des chemins, réponse
+des services et succès des appels. Ces points requièrent une validation runtime;
+ils ne sont pas supposés dans cette baseline.
 
 ### 4.3 EBank → Customer via Feign/REST
 
@@ -341,6 +533,147 @@ future est mentionnée dans `requirements.md`.
    Config Server identifié, sont à expliquer si cela reste pertinent au projet.
 9. **À confirmer** — l'état opérationnel Actuator, les objectifs de performance et les garanties
    de disponibilité ne sont pas documentés.
+
+### 7.1 Questions de conception ouvertes pour notre architecture
+
+Les éléments ci-dessous ne sont pas des décisions ni des tâches d'implémentation.
+Ils prolongent l'analyse de la référence afin que la conception de notre
+architecture cible soit conduite par les besoins plutôt que par la fidélité à
+Youssfi. Pour chaque axe, la distinction est : **Youssfi observé → analyse →
+question pour notre architecture → décision ultérieure**.
+
+1. **Nombre et frontières des services**
+   - **Youssfi observé** : plusieurs applications/services distincts couvrent
+     discovery, Gateway, clients, comptes, bot et interfaces web.
+   - **Analyse** : cette séparation rend visibles des responsabilités et des
+     communications distribuées, mais augmente le nombre de composants à
+     configurer, exécuter et faire évoluer.
+   - **Question pour notre architecture** : quelles responsabilités métier
+     nécessitent réellement des frontières de déploiement et de données
+     indépendantes?
+   - **Décision ultérieure** : définir le nombre et les frontières après analyse
+     des exigences, sans obligation de conserver les cinq services de référence.
+2. **Un ou plusieurs frontends**
+   - **Youssfi observé** : deux applications Angular proches existent; leurs
+     différences de rôle ne sont pas établies et un chemin de chat diverge.
+   - **Analyse** : plusieurs clients peuvent servir des publics ou parcours
+     distincts, mais une duplication sans besoin distinct ajoute du coût de
+     maintenance.
+   - **Question pour notre architecture** : quels utilisateurs et parcours
+     justifient une ou plusieurs interfaces?
+   - **Décision ultérieure** : choisir le nombre, le périmètre et les éventuelles
+     différences des frontends à partir des besoins; ne pas présumer qu'il en
+     faut deux.
+3. **API Gateway**
+   - **Youssfi observé** : un Gateway est visé par les frontends; les routes
+     effectives et leur succès runtime restent à confirmer.
+   - **Analyse** : un point d'entrée commun peut centraliser le routage et des
+     préoccupations transverses, mais ajoute un saut réseau et un composant
+     critique potentiel.
+   - **Question pour notre architecture** : les consommateurs et besoins
+     transverses justifient-ils un Gateway, et quelles responsabilités lui
+     confier?
+   - **Décision ultérieure** : retenir ou non un Gateway, après comparaison avec
+     des routes directes ou une configuration explicite.
+4. **Service discovery**
+   - **Youssfi observé** : Eureka Server et des clients Eureka sont déclarés;
+     leur fonctionnement effectif n'a pas été validé.
+   - **Analyse** : la découverte dynamique peut éviter de fixer les adresses
+     d'instances, mais crée une dépendance opérationnelle.
+   - **Question pour notre architecture** : la topologie et le mode
+     d'hébergement nécessitent-ils de la découverte dynamique; si oui, Eureka
+     ou une autre approche est-elle adaptée?
+   - **Décision ultérieure** : sélectionner une approche ou ne pas ajouter de
+     service discovery, selon la topologie réellement retenue.
+5. **Configuration et secrets**
+   - **Youssfi observé** : des POMs de la référence contiennent des éléments de
+     Spring Cloud Config Client; aucun Config Server n'a été identifié dans
+     l'analyse actuelle. Dans les configurations consultées de Customer et
+     EBank, le client Config est désactivé.
+   - **Analyse** : une dépendance déclarée ne prouve pas l'usage runtime ni
+     l'existence d'une configuration centralisée. Les paramètres applicatifs
+     ordinaires et les secrets (clés LLM, Telegram/Discord ou autres
+     identifiants) sont des sujets distincts et ne doivent pas être confondus.
+   - **Questions pour notre architecture** : quelle configuration doit être
+     externalisée ou centralisée, si cela est nécessaire? Comment gérer les
+     secrets séparément, sans les intégrer au code ni les traiter comme de
+     simples paramètres de configuration?
+   - **Décision ultérieure** : évaluer un éventuel Config Server et les options
+     de gestion des secrets à partir des environnements et exigences. Cela ne
+     décide ni de l'ajout ni de l'utilisation de Spring Cloud Config Server.
+6. **Communication entre composants**
+   - **Youssfi observé** : les interfaces métier utilisent REST; EBank appelle
+     Customer avec Feign sur HTTP/REST; aucun événementiel métier n'est observé
+     dans les sources étudiées.
+   - **Analyse** : l'appel synchrone convient à un résultat immédiat mais lie
+     le parcours aux disponibilités et latences des services appelés. Les
+     événements peuvent découpler certains traitements, au prix de contrats,
+     cohérence et opérations supplémentaires.
+   - **Question pour notre architecture** : quels échanges requièrent une
+     réponse immédiate, et existe-t-il des besoins métier justifiant une
+     communication asynchrone ou événementielle?
+   - **Décision ultérieure** : choisir REST/Feign ou, si un besoin le justifie,
+     un mécanisme événementiel tel que Kafka; aucun choix ni ajout Kafka n'est
+     fait dans cette consolidation.
+7. **Architecture AI et MCP**
+   - **Youssfi observé** : le bot utilise Spring AI, un fournisseur OpenAI et un
+     client MCP connecté à des capacités exposées par des serveurs MCP.
+   - **Analyse** : cette séparation permet d'explorer l'orchestration AI et les
+     outils, mais apporte des dépendances externes, des coûts/latences et des
+     besoins de contrôle des outils.
+   - **Questions pour notre architecture** : quel cas d'usage justifie l'AI?
+     Une orchestration Spring AI et des interfaces MCP apportent-elles une
+     valeur au-delà d'appels métier directs, et quelles capacités l'agent
+     pourrait-il appeler?
+   - **Décision ultérieure** : préciser le rôle de l'AI, le choix des
+     composants/interfaces et leurs limites après établissement des cas d'usage;
+     ne pas présumer du maintien du bot ou de MCP.
+8. **Sécurité**
+   - **Youssfi observé** : aucune dépendance Spring Security n'a été identifiée
+     dans les POMs consultés; le Gateway configure un CORS permissif et les
+     capacités MCP comprennent des opérations de création.
+   - **Analyse** : CORS n'est pas un contrôle d'identité ou d'autorisation; la
+     visibilité réseau et les éventuels contrôles hors code restent inconnus.
+   - **Questions pour notre architecture** : quels utilisateurs, services et
+     outils doivent être authentifiés et autorisés? Quelles données et
+     opérations doivent être protégées?
+   - **Décision ultérieure** : définir les exigences de sécurité et les
+     contrôles adaptés avant de fixer une solution technique.
+9. **Résilience et disponibilité**
+   - **Youssfi observé** : EBank déclare Resilience4j/circuit breaker et un
+     fallback Customer; les politiques runtime et le comportement métier
+     associé ne sont pas établis.
+   - **Analyse** : les appels distribués et fournisseurs externes créent des
+     modes de panne distincts; un fallback peut masquer une défaillance ou
+     produire un résultat métier invalide.
+   - **Questions pour notre architecture** : quels parcours doivent rester
+     disponibles en cas de panne, quels échecs peuvent être retentés ou
+     compensés, et quels objectifs de disponibilité sont attendus?
+   - **Décision ultérieure** : définir les politiques et comportements par
+     parcours en fonction des objectifs métier, sans présumer d'un mécanisme
+     unique.
+10. **Observabilité**
+    - **Youssfi observé** : Actuator est déclaré pour plusieurs applications;
+      l'exposition effective des endpoints et les métriques réellement
+      collectées ne sont pas établies.
+    - **Analyse** : une dépendance de santé seule ne démontre pas une capacité
+      d'exploitation ou de diagnostic de bout en bout.
+    - **Questions pour notre architecture** : quelles informations de santé,
+      journaux, métriques et corrélations sont nécessaires aux opérations et
+      au diagnostic?
+    - **Décision ultérieure** : formaliser le besoin et le niveau d'observabilité
+      proportionné au périmètre avant de choisir des outils.
+11. **Persistance**
+    - **Youssfi observé** : Customer et EBank utilisent JPA/H2 avec des
+      datasources `mem:` et des données initialisées au démarrage.
+    - **Analyse** : cette configuration facilite l'exécution pédagogique,
+      mais ne démontre ni durabilité après redémarrage ni exigences de
+      cohérence/charge de production.
+    - **Questions pour notre architecture** : quelles données doivent être
+      durables, qui en est propriétaire, quelles contraintes de cohérence
+      s'appliquent et quels besoins de sauvegarde/récupération existent?
+    - **Décision ultérieure** : définir la stratégie de persistance à partir de
+      ces exigences; aucun moteur ou changement de stockage n'est choisi ici.
 
 ## 8. Conséquences pour cette évolution
 

@@ -114,6 +114,12 @@ implicite sur les flux cibles du projet.
 - **THEN** ils incluent les appels vérifiés vers
   `http://localhost:9999/EBANK-SERVICE/accounts` et
   `http://localhost:9999/EBANK-BOT/chat`
+- **AND** `angular-front` appelle également
+  `http://localhost:9999/EBANK-BOT/chatStream?query=...`
+- **AND** la méthode cliente nommée `askAgentSteam` de `ebank-ang-front`
+  appelle `/EBANK-BOT/chat?query=...`, et non `/chatStream`
+- **AND** la baseline ne déduit pas une différence fonctionnelle voulue entre
+  les frontends de ces seuls noms de méthode ou chemins
 - **AND** la baseline distingue les appels observés dans les frontends de la
   configuration de routage du Gateway
 - **AND** elle indique que le Gateway WebFlux déclare un
