@@ -26,19 +26,19 @@
 
 ## 3. Finaliser le System Design documentaire
 
-- [ ] 3.1 Vérifier que `design.md` couvre frontières, propriété des données, couplages, disponibilité, résilience, performance, scalabilité, sécurité, observabilité et fragilités.
-- [ ] 3.2 Documenter les choix observés, problèmes adressés, alternatives et compromis dans le périmètre de `requirements.md`.
-- [ ] 3.3 Maintenir explicitement les questions non résolues comme points à confirmer, sans supposition ni implémentation.
-- [ ] 3.4 Vérifier qu'aucune technologie hors périmètre, dépendance ou intégration du dépôt Youssfi n'est introduite.
+- [x] 3.1 Vérifier que `design.md` couvre frontières, propriété des données, couplages, disponibilité, résilience, performance, scalabilité, sécurité, observabilité et fragilités.
+- [x] 3.2 Documenter les choix observés, problèmes adressés, alternatives et compromis dans le périmètre de `requirements.md`.
+- [x] 3.3 Maintenir explicitement les questions non résolues comme points à confirmer, sans supposition ni implémentation.
+- [x] 3.4 Vérifier qu'aucune technologie hors périmètre, dépendance ou intégration du dépôt Youssfi n'est introduite.
 
 ## 4. Cohérence documentaire du projet
 
-- [ ] 4.1 Mettre à jour `PROJECT-CONTEXT.md` uniquement pour refléter la baseline et son niveau de preuve, sans présenter le code de référence comme code local.
-- [ ] 4.2 Alimenter `interview.md` avec les décisions de cette évolution, si le fichier est créé ou mis à jour dans le cadre de l'évolution documentaire.
-- [ ] 4.3 Vérifier l'alignement entre proposition, spécification, design, tâches, `requirements.md` et les critères d'acceptation REQ-001 à REQ-014.
+- [x] 4.1 Mettre à jour `PROJECT-CONTEXT.md` uniquement pour refléter la baseline et son niveau de preuve, sans présenter le code de référence comme code local.
+- [x] 4.2 Alimenter `interview.md` avec les décisions de cette évolution, si le fichier est créé ou mis à jour dans le cadre de l'évolution documentaire.
+- [x] 4.3 Vérifier l'alignement entre proposition, spécification, design, tâches, `requirements.md` et les critères d'acceptation REQ-001 à REQ-014.
 
 ## 5. Revue de clôture
 
-- [ ] 5.1 Confirmer que les changements se limitent aux artefacts/documentation de baseline et qu'aucun code ou runtime n'a été modifié.
-- [ ] 5.2 Vérifier que chaque point à confirmer demeure non résolu tant que les sources locales ou une vérification runtime ne sont pas disponibles.
-- [ ] 5.3 Effectuer une revue documentaire finale; aucun test runtime n'est attendu en l'absence de changement applicatif.
+- [x] 5.1 Confirmer que les changements se limitent aux artefacts/documentation de baseline et qu'aucun code ou runtime n'a été modifié.
+- [x] 5.2 Vérifier que chaque point à confirmer demeure non résolu tant que les sources locales ou une vérification runtime ne sont pas disponibles.
+- [x] 5.3 Effectuer une revue documentaire finale; aucun test runtime n'est attendu en l'absence de changement applicatif.

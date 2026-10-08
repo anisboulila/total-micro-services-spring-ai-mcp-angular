@@ -603,8 +603,10 @@ du cycle du processus ne doit être supposée.
 
 ### Disponibilité et résilience
 
-- **Fait vérifié dans le code de référence** : un seul service Eureka est configuré dans les sources étudiées;
-  EBank déclare un circuit breaker et un fallback Customer.
+- **Fait vérifié dans le code de référence** : un service Eureka est configuré
+  dans les sources étudiées; EBank déclare un circuit breaker et un fallback
+  Customer. Aucun déploiement multi-instance ou mécanisme de bascule du registre
+  n'est établi par les fichiers consultés.
 - **Déduit** : Eureka, Gateway, Customer, EBank, bot, plateformes de messagerie,
   LLM et MCP peuvent constituer des dépendances critiques pour leurs chemins
   respectifs. Un arrêt du Gateway affecte les clients qui l'utilisent; un arrêt
@@ -617,9 +619,9 @@ du cycle du processus ne doit être supposée.
 
 ### Performance et capacité
 
-- **Fait vérifié dans le code de référence** : les frontends adressent Gateway; certains parcours EBank
-  appellent ensuite Customer; le bot appelle un fournisseur LLM et éventuellement
-  un outil MCP.
+- **Fait vérifié dans le code de référence** : les frontends adressent Gateway;
+  certains parcours EBank appellent ensuite Customer; le bot appelle un
+  fournisseur LLM et peut disposer d'outils MCP.
 - **Déduit** : ces sauts réseau et appels externes augmentent la latence de bout
   en bout; le LLM et les outils MCP peuvent dominer le temps de réponse AI.
 - **Fait vérifié dans le code de référence** : les datasources H2 utilisent `mem:` et les destinations MCP du bot
@@ -629,18 +631,39 @@ du cycle du processus ne doit être supposée.
 - **À confirmer** : débit, limites de concurrence, mesures de latence, objectifs
   de disponibilité et comportement de charge; aucun benchmark/SLO n'est fourni.
 
+### Scalabilité
+
+- **Fait vérifié dans le code de référence** : les services métier ont leurs
+  propres processus et datasources H2 configurées en mémoire; le Bot utilise
+  des destinations MCP `localhost` fixes.
+- **Déduit** : la séparation en processus permet en principe d'envisager une
+  montée en charge indépendante, mais l'état mémoire, la découverte/résolution
+  non validée, les dépendances synchrones et les URL locales ne démontrent pas
+  une capacité à répartir ou faire fonctionner plusieurs instances en
+  production. La séparation apporte aussi un coût d'exploitation.
+- **À confirmer** : stratégie de déploiement, comportement multi-instance,
+  partage/partitionnement d'état, limites de concurrence et objectifs de
+  capacité; aucune mesure de scalabilité n'a été réalisée.
+- **Question pour notre architecture** : quelles charges et quels objectifs
+  justifieraient une séparation ou un scaling indépendant plutôt qu'une
+  conception plus simple? Cette baseline ne tranche pas.
+
 ### Sécurité
 
-- **Fait vérifié dans le code de référence** : les POMs consultés n'incluent pas Spring Security; le Gateway
-  autorise globalement toutes les origines, méthodes et en-têtes via CORS; les
-  méthodes MCP comprennent des opérations de création.
+- **Fait vérifié dans le code de référence** : Spring Security n'apparaît pas
+  dans les POMs consultés; le Gateway configure CORS pour toutes les origines,
+  méthodes et en-têtes; les méthodes MCP comprennent des opérations de création.
 - **Déduit** : l'exposition des endpoints et outils sans mécanisme visible
   d'authentification est un risque d'accès, mais les contrôles externes ou
-  d'environnement ne sont pas inspectés.
+  d'environnement ne sont pas inspectés. La configuration CORS concerne les
+  navigateurs et n'authentifie ni n'autorise les appelants.
 - **À confirmer** : exposition réseau réelle, protection des outils/endpoints MCP,
   secrets LLM/Telegram/Discord et exposition des consoles/endpoints de gestion.
 - Cette évolution documente ces limites seulement; elle ne conçoit ni n'implémente
   un mécanisme de sécurité.
+- **Question pour notre architecture** : quelles identités, opérations, données
+  et intégrations doivent être protégées? La solution de sécurité reste à
+  décider à partir de ces exigences.
 
 ### Observabilité
 
@@ -653,16 +676,29 @@ du cycle du processus ne doit être supposée.
 
 ### Alternatives et compromis
 
-| Décision observée dans la référence | Besoin adressé (interprétation) | Alternative pertinente (non implémentée) | Compromis (analyse architecturale) |
-|---|---|---|---|
-| Gateway + routage découvert | Entrée web et destinations de services centralisées. | URLs directes côté clients ou routes fixes. | Centralisation et découverte contre un composant supplémentaire et une dépendance de routage/registre. |
-| Eureka | Découverte par identifiant plutôt que connaissance des adresses d'instances. | Configuration statique des adresses. | Découverte dynamique contre opération et disponibilité du registre; le mode haute disponibilité n'est pas démontré. |
-| Feign sur REST | Client inter-service déclaratif, intégré à Spring Cloud. | Client HTTP explicite ou appels directs depuis le client. | Lisibilité et intégration discovery contre couplage d'exécution synchrone et latence réseau. |
-| MCP pour outils AI | Décrire des capacités appelables par le client AI. | Appels REST directs du bot aux APIs métier. | Interface de capacités adaptée à l'usage AI contre protocole/contrat supplémentaire et exigences de contrôle d'accès à vérifier. |
-| H2 mémoire | Exécution locale/pédagogique légère. | Stockage persistant déployé. | Simplicité d'exécution contre perte d'état à l'arrêt et limites de démonstration distribuée. |
+Les alternatives ci-dessous sont des options d'analyse, pas des composants
+déployés ni des décisions pour notre projet.
 
-Kafka n'est pas une alternative à implémenter dans ce change; seule sa place
-future est mentionnée dans `requirements.md`.
+| Choix observé dans la référence | Besoin adressé (interprétation) | Alternative envisageable (non implémentée) | Compromis (analyse architecturale) |
+|---|---|---|---|
+| Plusieurs services métier et de plateforme | Séparer des responsabilités et expérimenter des communications distribuées. | Regrouper des responsabilités liées ou commencer avec moins de frontières de déploiement. | Isolation et indépendance potentielles contre davantage de processus, contrats, réseau et opérations. |
+| Deux frontends similaires | Offrir des interfaces web aux parcours comptes et chat; leur duplication distincte n'est pas expliquée. | Une seule interface web ou des interfaces séparées si des utilisateurs/parcours différents le justifient. | Expérimentation/composition contre duplication, maintenance et cohérence UI. |
+| Gateway avec discovery locator déclaré | Point d'entrée web commun et acheminement par destination logique. | URLs directes côté clients ou routes explicites. | Centralisation contre saut réseau et dépendance supplémentaire; la génération et le succès des routes ne sont pas établis en runtime. |
+| Eureka | Découvrir des services par identifiant logique. | Adresses ou routes configurées explicitement. | Découverte dynamique contre un registre à configurer et une dépendance de disponibilité. |
+| Feign sur REST | Appel Customer déclaratif depuis EBank. | Client HTTP explicite ou autre découpage de la responsabilité métier. | Intégration Spring Cloud/lisibilité contre couplage synchrone et latence réseau. |
+| Annotation circuit breaker avec Customer fallback | Fournir un chemin alternatif en cas d'échec de l'appel si le circuit invoque le fallback. | Propager l'erreur ou définir un résultat métier d'indisponibilité/rejet. | Dégradation contrôlée potentielle contre risque de masquer l'échec; l'état/configuration runtime est inconnu et le chemin actuel peut laisser poursuivre la création de compte. |
+| Spring Cloud Config Client présent, aucun Config Server identifié; client désactivé dans Customer/EBank consultés | Le besoin d'externaliser/centraliser les paramètres n'est pas établi par cette présence seule. | Configuration fournie par l'application/environnement sans serveur central dédié. | Centralisation potentielle contre service et cycle d'exploitation additionnels; aucun Config Server ne doit être inféré. |
+| MCP pour outils AI | Publier des capacités métier à l'intention du client MCP du Bot. | Le Bot peut appeler directement des APIs REST si le besoin s'y prête. | Contrat d'outils réutilisable contre une interface/protocole supplémentaire et nécessité de contrôler les opérations. |
+| H2 mémoire | Base légère pour exécution pédagogique locale. | Une stratégie de stockage durable choisie à partir des exigences de conservation et cohérence. | Simplicité contre perte des données à l'arrêt et limites pour la démonstration de durabilité; aucun autre moteur n'est décidé ici. |
+| Actuator dans les dépendances | Fournir des capacités de gestion/santé selon les endpoints configurés. | Niveau de vérification opérationnelle proportionné au besoin. | Capacités disponibles contre exposition à contrôler; la présence de la dépendance ne prouve pas les métriques ou leur collecte. |
+| Propriétés dédiées aux identifiants d'intégration (valeurs masquées dans la source consultée) | Fournir les paramètres d'accès aux intégrations du Bot. | Injecter les secrets depuis l'environnement d'exécution ou un mécanisme de gestion approuvé ultérieurement. | Simplicité de configuration contre exigences de protection, distribution et rotation; les pratiques runtime ne sont pas connues. |
+
+Pour les communications, REST/Feign synchrone convient à une réponse immédiate
+mais crée une dépendance de latence/disponibilité; un échange événementiel peut
+être envisagé uniquement si un besoin métier asynchrone distinct le justifie,
+avec des compromis de cohérence et de traitement. Kafka est évoqué dans les
+requirements comme sujet potentiel futur : il n'est ni observé dans la référence
+étudiée ni implémenté dans ce change.
 
 ## 7. Limites et questions ouvertes
 

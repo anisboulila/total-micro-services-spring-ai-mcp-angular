@@ -75,6 +75,43 @@ justifient. La simplicité, la maintenabilité, l'évolutivité, la valeur
 pédagogique et la capacité à défendre les décisions en entretien guident les
 choix, jamais la fidélité à la référence.
 
+### Baseline documentaire — état du workspace et niveau de preuve
+
+L'inventaire du workspace local effectué pour la première évolution a confirmé
+la présence de `PROJECT-CONTEXT.md` et `requirements.md`, ainsi que des
+artefacts OpenSpec et des règles de projet. À la date de cette analyse, aucun
+code applicatif Java/Angular, POM Maven ou projet Angular n'a été trouvé dans
+le workspace. **Notre workspace n'est pas le dépôt Youssfi** : les composants,
+versions, dépendances, routes et comportements décrits comme observés sont
+attribués au dépôt pédagogique, non à une implémentation locale.
+
+Source de référence effectivement consultée :
+`mohamedYoussfi/totale-micro-services-spring-ai-mcp-angular-telegram-discord`,
+branche `main`, commit
+`bf4c7f2750e4c731662e8138023fd8e6b4e4a475`. Le dépôt sert à comprendre et
+critiquer l'idée métier et les choix pédagogiques; il n'a pas été copié, cloné,
+intégré ou transformé en dépendance.
+
+Les artefacts de la baseline distinguent :
+
+* **Fait vérifié dans le code de référence** : trouvé dans les sources,
+  manifestes ou configurations consultés à cette révision.
+* **Déduction architecturale** : interprétation des faits; elle ne signifie pas
+  qu'un comportement runtime a été testé.
+* **À confirmer** : information absente ou nécessitant les sources locales,
+  une décision métier, ou une validation runtime.
+
+Les principales questions encore ouvertes concernent le nombre et les
+frontières des services, un ou plusieurs frontends, le besoin d'un Gateway et
+d'une découverte dynamique (Eureka ou autre approche), la centralisation de
+configuration et l'éventuel Config Server (aucun n'a été identifié dans la
+référence consultée), la gestion distincte des secrets, REST/Feign ou un
+éventuel échange événementiel motivé par un besoin, l'intérêt de Spring AI/MCP,
+les contrôles de sécurité, les politiques de résilience, les objectifs
+d'observabilité et de disponibilité, ainsi que la propriété et la durabilité
+des données. Aucune de ces questions ne constitue à ce stade une décision
+d'architecture cible.
+
 Dans toute analyse, distinguer :
 
 1. **Architecture observée** : faits attribués à la référence pédagogique.
@@ -1090,17 +1127,27 @@ Privilégier :
 
 ---
 
-# 21. État actuel
+# 21. État actuel et baseline documentaire
 
-## Déjà analysé — référence pédagogique
+## Référence explorée
 
-Repository de référence (distinct du code local) :
+Repository pédagogique (distinct du workspace local) :
 
 ```text
 totale-micro-services-spring-ai-mcp-angular-telegram-discord
+main @ bf4c7f2750e4c731662e8138023fd8e6b4e4a475
 ```
 
-Architecture observée dans la référence comprise à haut niveau :
+La baseline documentaire initiale est établie dans
+`openspec/changes/project-foundation-architecture-baseline/`. Elle documente
+les composants, routes REST, chemins frontend/Gateway, appels Feign, MCP,
+Eureka, limites et compromis de cette révision de référence. Le détail de
+l'analyse est dans `design.md`; la spécification est dans
+`specs/architecture-baseline/spec.md`. Les tâches réalisées sont suivies dans
+`tasks.md`.
+
+Architecture observée dans cette référence à haut niveau (non vérifiée comme
+architecture locale et non retenue automatiquement comme cible) :
 
 ```text
 Angular
@@ -1126,7 +1173,7 @@ MCP Servers
 Business services
 ```
 
-Technologies actuelles identifiées :
+Technologies déclarées/observées dans la référence, pas dans le runtime local :
 
 * Java 21
 * Spring Boot
@@ -1145,9 +1192,24 @@ Technologies actuelles identifiées :
 
 ---
 
-# 22. Ce qui n'est PAS encore implémenté
+# 22. État du workspace local
 
-Ne pas considérer comme déjà réalisé :
+Le workspace local examiné contient les documents et artefacts du projet, mais
+aucun code applicatif Java/Angular, POM Maven ou projet Angular. Par conséquent,
+les composants et flux ci-dessus décrivent exclusivement la référence
+pédagogique; il n'existe pas encore de correspondance d'implémentation locale à
+confirmer.
+
+Les points de conception cible listés en section 2 restent ouverts jusqu'à
+analyse des exigences et System Design dédié. Une propriété/configuration
+observée dans les fichiers de référence ne suffit pas à établir un comportement
+runtime.
+
+---
+
+# 23. Technologies hors périmètre de la première évolution
+
+Ne pas considérer comme implémentés par la baseline documentaire :
 
 * Keycloak
 * OAuth2/OIDC
@@ -1170,37 +1232,22 @@ Ces éléments appartiennent à la roadmap future.
 
 ---
 
-# 23. Task courante
+# 24. État de l'évolution
 
-**Phase : Reverse Engineering**
+**Évolution : Project Foundation & Architecture Baseline**
 
-Objectif actuel :
+La phase d'exploration a établi les sources et niveaux de preuve. Les tâches
+documentaires 1.1–1.4, 2.1–2.7 et 3.1–5.3 sont terminées dans le change.
+L'état détaillé et la preuve d'avancement restent consignés dans `tasks.md`.
 
-Comprendre suffisamment le repository de référence pour pouvoir reconstruire et faire évoluer l'architecture de manière maîtrisée.
-
-La prochaine étape après cette cartographie est :
-
-**Créer les documents SDD/OpenSpec initiaux.**
-
-Ordre prévu :
-
-```text
-PROJECT-CONTEXT.md
-        ↓
-requirements.md
-        ↓
-specification.md
-        ↓
-design.md
-        ↓
-tasks.md
-```
-
-Puis première task d'implémentation.
+Cette évolution reste documentaire; elle ne constitue pas une autorisation
+d'implémentation runtime. Les prochaines décisions d'architecture doivent
+partir des exigences du projet et de la comparaison des options, pas d'une
+reproduction de la référence.
 
 ---
 
-# 24. Règle absolue du projet
+# 25. Règle absolue du projet
 
 Ne jamais retenir une technologie ou un composant uniquement parce qu'il figure
 dans le repository Youssfi, dans ce document ou dans une roadmap. La référence
@@ -1233,7 +1280,7 @@ observée, son analyse et l'architecture cible décidée pour notre projet.
 
 ---
 
-# 25. Objectif final d'entretien
+# 26. Objectif final d'entretien
 
 À la fin du projet, être capable de répondre naturellement à des questions comme :
 
@@ -1279,7 +1326,7 @@ Le projet doit servir de support concret à chacune de ces réponses.
 
 ---
 
-## 26. Principe pédagogique final
+## 27. Principe pédagogique final
 
 Le projet ne doit jamais être traité comme :
 
