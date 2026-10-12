@@ -1366,3 +1366,31 @@ ChatGPT = mentor / architecte / reviewer.
 GitHub Copilot = assistant d'implémentation.
 
 Utilisateur = responsable technique du projet et doit comprendre ce qui est produit.
+
+---
+
+## Clarification du périmètre pédagogique — OpenSpec
+
+Le propriétaire a décidé que ce projet est un fil rouge pédagogique intégrant
+Kafka, Spring AI et MCP, avec OpenSpec/SDD comme processus de travail. Ces choix
+technologiques ne valident pas à eux seuls un besoin métier.
+
+- Kafka doit être intégré avec un producteur, un topic et un consommateur réels.
+  L’adoption pédagogique est **DÉCIDÉE** et ne dépend pas de H-6; le scénario
+  métier et le consommateur concret restent **À CONFIRMER**. `audit-service`
+  demeure un candidat. Préserver DEC-07 et ses garanties; Kafka Streams et
+  `statistics-service` sont exclus du périmètre initial.
+- Spring AI et MCP sont des objectifs pédagogiques **DÉCIDÉS**. Le détail
+  produit de UC-07 et le parcours « À quel client appartient ce compte ? »
+  restent **À CONFIRMER** tant que le propriétaire ne les a pas approuvés.
+- Les outils MCP restent en lecture seule, réutilisent les API métier et
+  laissent l’application des autorisations aux services propriétaires. Agent
+  et RAG ne sont pas retenus sans besoin distinct confirmé.
+- Cette clarification documentaire ne constitue pas une autorisation
+  d’implémentation. La change
+  `openspec/changes/validate-pedagogical-project-scope/` reste disponible pour
+  revue; elle n’est ni archivée ni appliquée au runtime.
+
+Cette section précise l’état actuel du périmètre pédagogique décrit dans les
+sections antérieures; les observations de la référence et les exigences métier
+encore candidates ou **À CONFIRMER** ne sont pas promues en décisions.
