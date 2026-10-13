@@ -14,7 +14,9 @@ Statuts utilisés :
 - **À CONFIRMER** — dépend d’une validation métier ou d’une information
   manquante.
 
-## Requirement: Traçabilité des décisions vers les exigences
+## ADDED Requirements
+
+### Requirement: Traçabilité des décisions vers les exigences
 
 Chaque décision d’architecture DOIT être reliée à une exigence candidate de la
 baseline `business-requirements` (cas d’usage UC-01 à UC-07, exigences
@@ -36,7 +38,7 @@ processus du projet.
 - **AND** aucune exigence candidate n’est présentée comme validée par le
   propriétaire du produit
 
-## Requirement: Alternatives, justification et compromis
+### Requirement: Alternatives, justification et compromis
 
 Chaque choix technologique ou architectural important DOIT être justifié par un
 besoin réel, comparé à ses principales alternatives et assorti de ses
@@ -59,7 +61,7 @@ compromis.
 - **THEN** le design consigne explicitement qu’elle n’est pas retenue ou qu’elle
   est différée, avec le déclencheur qui justifierait de la réévaluer
 
-## Requirement: Couverture des domaines d’architecture
+### Requirement: Couverture des domaines d’architecture
 
 Le Target System Design DOIT couvrir les domaines suivants.
 
@@ -100,7 +102,7 @@ Le Target System Design DOIT couvrir les domaines suivants.
   déploiement, CI/CD, stratégie de test et de validation, risques, fragilités
   et trajectoire d’évolution
 
-## Requirement: Questions d’entretien
+### Requirement: Questions d’entretien
 
 Le design DOIT permettre de répondre de manière argumentée aux questions
 d’entretien listées dans le design (architecture, services, Kafka, REST vs
@@ -113,7 +115,7 @@ observabilité, MCP, Agent, RAG, évolution).
 - **THEN** sa réponse renvoie à des décisions `DEC-xx` et à leurs compromis
 - **AND** distingue ce qui est ferme de ce qui reste à confirmer
 
-## Requirement: Cohérence et simplicité
+### Requirement: Cohérence et simplicité
 
 Le Target System Design DOIT rester cohérent avec l’objectif pédagogique et
 professionnel du projet et avec la règle de simplicité de `PROJECT-CONTEXT.md`.
@@ -132,7 +134,7 @@ professionnel du projet et avec la règle de simplicité de `PROJECT-CONTEXT.md`
 - **WHEN** le design repose sur une hypothèse
 - **THEN** elle est listée comme hypothèse avec son impact si elle est fausse
 
-## Requirement: Périmètre documentaire
+### Requirement: Périmètre documentaire
 
 Cette évolution DOIT rester documentaire.
 

@@ -1,6 +1,6 @@
 # Définir les exigences métier — Étape 1 — Requirements / Exigences
 
-## Pourquoi
+## Why
 
 Le projet dispose d’une baseline documentaire des fonctionnalités et de
 l’architecture observées dans la référence pédagogique de Mohamed Youssfi. Le
@@ -15,7 +15,7 @@ déduites de son comportement doivent donc rester identifiées comme telles et
 soumises à confirmation tant que le propriétaire du projet n’a pas pris de
 décision explicite.
 
-## Modifications
+## What Changes
 
 - Établir une baseline d’exigences révisable, assortie de niveaux de preuve,
   couvrant le contexte métier, les acteurs, le périmètre, les cas d’usage, les

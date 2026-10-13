@@ -23,7 +23,9 @@ Sauf indication contraire, les exigences candidates du produit déduites de la
 référence sont **DÉDUITES / À CONFIRMER** et ne constituent pas un périmètre
 approuvé.
 
-## Requirement: Contexte métier et objectif du produit
+## ADDED Requirements
+
+### Requirement: Contexte métier et objectif du produit
 
 Le projet est une **reconstruction à partir de zéro**, inspirée d’un exemple de
 gestion de clients et de comptes bancaires. La référence sert à découvrir des
@@ -45,7 +47,7 @@ implémentation à reproduire.
 - **AND** le dépôt Youssfi n’est considéré ni comme l’implémentation de notre
   produit ni comme une source d’exigences contraignante
 
-## Requirement: Acteurs et parties externes
+### Requirement: Acteurs et parties externes
 
 La baseline des exigences DOIT distinguer les acteurs directement attestés par
 la référence des acteurs candidats pour le système cible.
@@ -66,7 +68,7 @@ la référence des acteurs candidats pour le système cible.
   externes utilisées par la référence ; toute intégration cible est
   **À CONFIRMER**
 
-## Requirement: Périmètre et cas d’usage
+### Requirement: Périmètre et cas d’usage
 
 La baseline DOIT distinguer les capacités démontrées par la référence, le
 périmètre candidat déduit de ces capacités et les décisions qui restent à
@@ -93,7 +95,7 @@ prendre.
 - **AND** le besoin associé à chaque cas d’usage candidat, les acteurs autorisés, les règles métier et son inclusion dans notre produit restent **À CONFIRMER**
 - **AND** les virements, paiements, relevés, calculs d’intérêts, devises, gestion des cartes et autres fonctions bancaires ne sont pas déduits de la référence et restent hors périmètre, sauf confirmation distincte
 
-## Requirement: Exigences fonctionnelles
+### Requirement: Exigences fonctionnelles
 
 Les exigences fonctionnelles candidates DOIVENT exprimer des résultats métier
 visibles par l’utilisateur ou le système, sans prescrire d’architecture ni de
@@ -155,7 +157,7 @@ technologie.
 - **AND** cette spécification des exigences ne choisit pas une future
   architecture système cible
 
-## Requirement: Exigences non fonctionnelles
+### Requirement: Exigences non fonctionnelles
 
 La baseline DOIT identifier les besoins candidats en matière de qualité et les
 objectifs d’acceptation manquants, sans choisir de mécanisme d’implémentation ni
@@ -177,7 +179,7 @@ inventer de niveaux de service numériques.
   protocole de communication, passerelle, pile d’observabilité, modèle de
   déploiement ou architecture d’IA particulière n’est prescrite
 
-## Requirement: Contraintes et décisions explicites
+### Requirement: Contraintes et décisions explicites
 
 La baseline des exigences DOIT consigner les contraintes du projet séparément
 des détails d’implémentation observés dans la référence.
@@ -195,7 +197,7 @@ des détails d’implémentation observés dans la référence.
   sélectionner des approches concernant les frontières, les communications,
   la gestion des données, la sécurité, l’IA ou l’exploitation
 
-## Requirement: Hypothèses et questions ouvertes
+### Requirement: Hypothèses et questions ouvertes
 
 Les énoncés produit non validés DOIVENT rester visibles en tant qu’hypothèses
 ou questions nécessitant confirmation.

@@ -1,6 +1,6 @@
 # Documenter les décisions d’architecture — Étape 3 — ADR / Trade-offs
 
-## Pourquoi
+## Why
 
 L’Étape 2 a défini une architecture cible et tracé ses choix sous forme de
 `DEC-xx` dans `openspec/changes/define-target-system-design/design.md`.
@@ -9,7 +9,7 @@ au moyen d’ADR concis qui explicitent le problème, les options et les
 conséquences. Elle ne refait pas le Target System Design et ne transforme pas
 les exigences candidates en besoins validés.
 
-## Modifications
+## What Changes
 
 - Regrouper les `DEC-01` à `DEC-22` dans des décisions d’architecture cohérentes,
   sans créer un ADR par détail d’implémentation.

@@ -1,6 +1,6 @@
 # Définir le Target System Design — Étape 2 — Architecture cible
 
-## Pourquoi
+## Why
 
 L’Étape 1 a établi une baseline d’exigences **candidates** pour notre
 reconstruction de zéro (`define-business-requirements-and-target-system-design`,
@@ -19,7 +19,7 @@ ajoutée parce qu’elle figure dans la référence ou parce qu’elle est popul
 Chaque choix important documente le besoin traité, les alternatives, la
 justification, les compromis et son statut (ferme ou à confirmer).
 
-## Modifications
+## What Changes
 
 - Produire le **Target System Design** de notre projet dans `design.md` :
   contexte et frontières, responsabilités, propriété des données, interactions,
