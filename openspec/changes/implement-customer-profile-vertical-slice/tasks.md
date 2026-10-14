@@ -9,7 +9,7 @@
 
 ## 1. Environnement et décisions de layout
 
-- [ ] 1.1 **CPS-ENV-01** — Inventorier les outils
+- [x] 1.1 **CPS-ENV-01** — Inventorier les outils
 
 - **Objectif / résultat :** connaître l’état réel de Java, Maven, Docker, Compose et OpenSpec avant installation.
 - **Dépendances :** aucune.
@@ -57,7 +57,7 @@
 - **Erreurs / diagnostic :** WSL2/virtualisation/droits ou daemon arrêté; utiliser le message exact de Docker Desktop, ne pas supprimer de volumes.
 - **Point d’arrêt :** attendre la connexion daemon réussie.
 
-- [ ] 1.5 **CPS-ENV-05** — Valider Docker Compose
+- [x] 1.5 **CPS-ENV-05** — Valider Docker Compose
 
 - **Objectif / résultat :** prouver que Compose et l’exécution d’un conteneur fonctionnent.
 - **Dépendances :** CPS-ENV-04.
@@ -69,7 +69,7 @@
 - **Erreurs / diagnostic :** proxy/DNS/réseau d’image différent d’un daemon arrêté; lire l’erreur Docker et confirmer `docker info`.
 - **Point d’arrêt :** attendre les deux résultats avant Compose applicatif.
 
-- [ ] 1.6 **CPS-DES-01** — Approuver le layout du dépôt
+- [x] 1.6 **CPS-DES-01** — Approuver le layout du dépôt
 
 - **Objectif / résultat :** décider le reactor Maven et chemins avant de générer quoi que ce soit.
 - **Dépendances :** CPS-ENV-01.
@@ -78,12 +78,13 @@
 - **Fichiers Copilot :** cette tâche, si acceptée, modifie uniquement `design.md` et `tasks.md`.
 - **Commandes :** `Get-ChildItem -Force`; `Get-ChildItem openspec/changes/implement-customer-profile-vertical-slice -Force`.
 - **Vérification / acceptation :** chemins et ports de développement choisis et inscrits; aucun choix implicite.
+- **Résultat approuvé :** `pom.xml` racine agrégateur; modules `customer-service/` et `api-gateway/` avec leurs POMs; `compose.yaml` à la racine; Keycloak sous `infra/keycloak/`; Java 21, Spring Boot 3.5.x; Gateway 8080, Customer 8082, Keycloak 8081, callback OIDC `127.0.0.1:8765`; PostgreSQL interne via `postgres:5432`, publié uniquement sur `127.0.0.1:5432` pour DBeaver.
 - **Erreurs / diagnostic :** aucun projet applicatif local n’existe; les changements historiques ne sont pas des preuves de layout runtime.
 - **Point d’arrêt :** attendre approbation explicite du layout; ne rien générer avant.
 
 ## 2. Docker Compose et services d’infrastructure
 
-- [ ] 2.1 **CPS-DOCKER-01** — Décrire le service PostgreSQL dans Compose
+- [x] 2.1 **CPS-DOCKER-01** — Décrire le service PostgreSQL dans Compose
 
 - **Objectif / résultat :** config Compose valide pour une base Customer locale.
 - **Dépendances :** CPS-DES-01, CPS-ENV-05.

@@ -26,13 +26,17 @@ fonctionnalité.
 
 ## Périmètre inclus
 
-- Un dépôt Maven racine proposé comme agrégateur, avec modules
-  `customer-service` et `api-gateway`; Java 21 et Spring Boot 3.5.x, versions
-  compatibles centralisées dans le parent.
-- Emplacements candidats : `pom.xml`, `customer-service/pom.xml`,
-  `api-gateway/pom.xml`, `compose.yaml`, configuration Keycloak de
-  développement sous `infra/keycloak/` et guide de démarrage local. Ce layout
-  reste à confirmer avant création.
+- Layout approuvé dans CPS-DES-01 : dépôt Maven mono-repo avec `pom.xml`
+  agrégateur à la racine et modules `customer-service/` et `api-gateway/`,
+  chacun avec son propre `pom.xml`. Java 21 et Spring Boot 3.5.x sont retenus;
+  les versions compatibles sont centralisées dans le POM parent.
+- `compose.yaml` est placé à la racine. Les fichiers d'import Keycloak de
+  développement sont placés sous `infra/keycloak/`, notamment
+  `infra/keycloak/realm-dev.json`; aucun secret réel n'est versionné.
+- Ports de développement approuvés : Gateway `8080`, Customer `8082`,
+  Keycloak `8081` et callback OIDC local `127.0.0.1:8765`. PostgreSQL écoute
+  sur `5432` dans le réseau Compose (`postgres:5432`) et est publié sur l'hôte
+  uniquement en boucle locale via `127.0.0.1:5432:5432` pour l'accès DBeaver.
 - Compose local limité à PostgreSQL, Keycloak, Gateway et Customer, avec
   persistance PostgreSQL et configuration Keycloak reproductible sans secret
   réel versionné.
@@ -138,10 +142,9 @@ tranche restent dans des changes ultérieures.
 
 ## Points d’attention
 
-- La structure du dépôt et la forme de l’agrégateur Maven ne sont pas établies
-  par les documents antérieurs. Le layout mono-dépôt décrit ici est une
-  proposition explicite à confirmer avant création des fichiers. Ce point
-  bloque les chemins précis des modules, pas le périmètre fonctionnel.
+- La structure du dépôt n'était pas établie par les documents antérieurs.
+  CPS-DES-01 approuve désormais le layout mono-dépôt et les ports décrits dans
+  « Périmètre inclus »; aucune structure applicative n'a encore été générée.
 - Le nom des endpoints n’était pas fixé dans les sources; le contrat est
   maintenant retenu pour cette tranche et détaillé ci-dessus.
 - Contrat retenu pour cette tranche : `POST /api/v1/customers`, HTTP 201 et

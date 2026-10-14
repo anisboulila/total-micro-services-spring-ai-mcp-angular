@@ -5,6 +5,9 @@
 # Maven
 target/
 
+# Local development environment
+/.env
+
 # OS
 .DS_Store
 Thumbs.db
