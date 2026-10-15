@@ -881,20 +881,35 @@ docs(architecture): document kafka communication
 
 Le projet doit progresser par petites évolutions.
 
-Pour chaque task :
+**La documentation fait partie intégrante de l'implémentation et de la
+validation de chaque tâche CPS.** Pour chaque tâche, dans l'ordre :
 
-1. comprendre l'objectif ;
-2. comprendre les concepts ;
-3. vérifier requirements/spec/design ;
-4. identifier les fichiers concernés ;
-5. implémenter ;
-6. tester ;
-7. reviewer ;
-8. vérifier les effets secondaires ;
-9. mettre à jour la documentation ;
-10. mettre à jour `interview.md` ;
-11. mettre à jour `PROJECT-CONTEXT.md` si nécessaire ;
-12. proposer le commit.
+1. Lire les exigences, spécifications, décisions, design, critères
+   d'acceptation et dépendances applicables.
+2. Implémenter uniquement le périmètre autorisé par la tâche.
+3. Expliquer les concepts et les fichiers touchés.
+4. Exécuter les vérifications prévues ou demander à l'apprenant de les exécuter;
+   ne jamais prétendre qu'une commande a été exécutée si ce n'est pas le cas.
+5. Consigner dans `openspec/changes/implement-customer-profile-vertical-slice/tasks.md`
+   une preuve synthétique des commandes et résultats réellement observés. Si
+   une preuve manque ou reste à confirmer, le dire explicitement sans inventer
+   de sortie.
+6. Enrichir le `interview.md` central avec les concepts, choix, compromis,
+   exemples du projet et questions d'entretien pertinents, selon sa structure
+   pédagogique.
+7. Mettre à jour `docs/local-development.md` si la tâche ajoute ou modifie une
+   procédure opérationnelle reproductible; distinguer les commandes proposées
+   des résultats réellement vérifiés et ne consigner aucun secret.
+8. Modifier les spécifications ou décisions OpenSpec uniquement si les
+   exigences ou décisions faisant autorité évoluent réellement. Ne pas dupliquer
+   dans ces artefacts le journal d'exécution ou les explications pédagogiques.
+9. Revoir les changements et leurs effets secondaires, puis cocher la tâche
+   uniquement lorsque tous ses critères d'acceptation sont démontrés.
+
+Respecter les points d'arrêt du backlog et ne pas commencer automatiquement la
+tâche suivante. Mettre à jour `PROJECT-CONTEXT.md` seulement lorsqu'une règle
+durable du projet change. Proposer un commit séparément; aucun commit n'est
+implicite.
 
 Ne pas avancer automatiquement vers plusieurs grosses fonctionnalités.
 

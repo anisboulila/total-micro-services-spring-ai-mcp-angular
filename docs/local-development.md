@@ -1,5 +1,72 @@
 # Local development
 
+## Environment and local containers
+
+The learner-reported environment inventory was Java 21.0.2, Maven 3.9.9,
+Docker 29.8.2, Docker Compose 5.5.1, and OpenSpec 1.14.0. `docker info`
+confirmed a reachable Linux daemon, and `docker run --rm hello-world`
+completed successfully. The exact executable paths from `Get-Command` were not
+preserved.
+
+Useful Windows PowerShell commands for checking the local tools and Compose
+configuration:
+
+```powershell
+Get-Command java,mvn,docker,openspec -ErrorAction SilentlyContinue | Select-Object Name,Source
+java -version
+mvn -version
+docker --version
+docker compose version
+docker info
+openspec --version
+docker compose config
+```
+
+Docker CLI and Docker daemon checks are different: `docker --version` reports
+the client, while `docker info` must be able to contact the server/daemon.
+`docker compose config` resolves the Compose configuration; it does not start
+containers.
+
+The current Compose file defines PostgreSQL and Keycloak. Start or inspect just
+those services with:
+
+```powershell
+docker compose up -d postgres keycloak
+docker compose ps postgres keycloak
+docker compose logs --tail 50 postgres
+docker compose logs --tail 80 keycloak
+```
+
+PostgreSQL health and connection readiness can be checked with:
+
+```powershell
+docker compose exec -T postgres pg_isready -U customer_app -d customer_db
+docker compose ps postgres
+```
+
+Use the database and username configured in the local environment if `.env`
+overrides the Compose defaults. For DBeaver on the host, connect to
+`127.0.0.1:5432` and use the configured database/user. Application containers
+must use `postgres:5432`, not `localhost:5432`. The host port is bound only to
+loopback. Never commit `.env` or share its password.
+
+### Repeatable PostgreSQL persistence check
+
+The following procedure uses only the dedicated test table and row. It resets
+that one probe row so a repeated run can demonstrate a new insertion; it does
+not delete application data or volumes.
+
+```powershell
+docker compose exec -T postgres psql -U customer_app -d customer_db -c "CREATE TABLE IF NOT EXISTS persistence_probe (id integer PRIMARY KEY); DELETE FROM persistence_probe WHERE id = 2; INSERT INTO persistence_probe (id) VALUES (2);"
+docker compose restart postgres
+docker compose ps postgres
+docker compose exec -T postgres psql -U customer_app -d customer_db -c "SELECT id FROM persistence_probe WHERE id = 2;"
+```
+
+The expected evidence is that the service returns to `healthy` and the final
+query returns row `2`. Do not use `docker compose down -v`: that removes named
+volumes and invalidates a persistence check.
+
 ## Keycloak and OIDC
 
 The local Keycloak realm is `customer-dev`. Its issuer is:
@@ -55,10 +122,30 @@ import file and this documentation.
 
 The realm import definition is maintained in `infra/keycloak/realm-dev.json`.
 It contains the local registration and role defaults but no users, credentials,
-or client secrets; it is intended only for local development. The Compose
-configuration mounts this file for Keycloak's startup import. The import itself
-was not exercised during this manual task, and the existing persistent realm
-was not overwritten.
+or client secrets; it is intended only for local development. `compose.yaml`
+contains a read-only mount for Keycloak's startup import. The configuration
+after that mount was added was not documented as revalidated with Compose, and
+the import itself was not exercised during this manual task. The existing
+persistent realm was not overwritten.
+
+To inspect the local Keycloak service and realm discovery from Windows
+PowerShell:
+
+```powershell
+docker compose up -d keycloak
+docker compose ps keycloak
+$KeycloakUrl = 'http://localhost:8081'
+$Realm = 'customer-dev'
+$Oidc = Invoke-RestMethod "$KeycloakUrl/realms/$Realm/.well-known/openid-configuration"
+$Oidc | Select-Object issuer,authorization_endpoint,token_endpoint,jwks_uri
+```
+
+The expected issuer for this local realm is
+`http://localhost:8081/realms/customer-dev`. Realm/client/role configuration
+was performed and inspected in the Keycloak console. Do not assume that
+`--import-realm` updates an already-existing persistent realm: the import
+behavior was not tested here, and the realm/volume must not be deleted merely
+to force an import.
 
 ## Local OIDC login with PKCE
 

@@ -5,7 +5,9 @@
 > résultats; Copilot les analyse et attend une validation explicite avant
 > toute modification ou tâche suivante. Toutes les cases restent décochées
 > jusqu’à réalisation et vérification. Le backlog global n’est jamais coché
-> par ce fichier.
+> par ce fichier. Pour chaque tâche terminée, consigner ci-dessous une preuve
+> synthétique réellement observée; si elle manque, l’indiquer sans reconstituer
+> une sortie.
 
 ## 1. Environnement et décisions de layout
 
@@ -20,6 +22,7 @@
 - **Vérification / acceptation :** tableau des versions disponibles et outils absents clairement identifiés; aucune hypothèse d’installation.
 - **Erreurs / diagnostic :** `Get-Command` absent = outil absent ou `PATH`; échec `docker info` = daemon/contexte, même si `docker --version` répond.
 - **Point d’arrêt :** attendre le compte rendu avant installation.
+- **Preuve observée :** inventaire rapporté : Java 21.0.2, Maven 3.9.9, Docker 29.8.2, Compose 5.5.1 et OpenSpec 1.14.0; `docker info` confirmait un daemon Linux joignable. Les chemins exacts retournés par `Get-Command` ne sont pas consignés dans le dépôt.
 
 - [ ] 1.2 **CPS-ENV-02** — Installer ou réparer Java 21
 
@@ -68,6 +71,7 @@
 - **Vérification / acceptation :** Compose répond et `hello-world` termine avec succès.
 - **Erreurs / diagnostic :** proxy/DNS/réseau d’image différent d’un daemon arrêté; lire l’erreur Docker et confirmer `docker info`.
 - **Point d’arrêt :** attendre les deux résultats avant Compose applicatif.
+- **Preuve observée :** `docker compose version` a répondu (Compose 5.5.1) et `docker run --rm hello-world` s’est terminé avec succès, selon le résultat rapporté par l’apprenant.
 
 - [x] 1.6 **CPS-DES-01** — Approuver le layout du dépôt
 
@@ -81,6 +85,7 @@
 - **Résultat approuvé :** `pom.xml` racine agrégateur; modules `customer-service/` et `api-gateway/` avec leurs POMs; `compose.yaml` à la racine; Keycloak sous `infra/keycloak/`; Java 21, Spring Boot 3.5.x; Gateway 8080, Customer 8082, Keycloak 8081, callback OIDC `127.0.0.1:8765`; PostgreSQL interne via `postgres:5432`, publié uniquement sur `127.0.0.1:5432` pour DBeaver.
 - **Erreurs / diagnostic :** aucun projet applicatif local n’existe; les changements historiques ne sont pas des preuves de layout runtime.
 - **Point d’arrêt :** attendre approbation explicite du layout; ne rien générer avant.
+- **Preuve / décision approuvée :** le layout et les ports ci-dessus ont été approuvés explicitement; aucun `pom.xml` n’a été généré à cette tâche.
 
 ## 2. Docker Compose et services d’infrastructure
 
@@ -95,6 +100,7 @@
 - **Vérification / acceptation :** configuration résolue, port documenté, volume nommé, aucun secret réel.
 - **Erreurs / diagnostic :** YAML mal indenté ou variable manquante; traiter la ligne indiquée par Compose.
 - **Point d’arrêt :** attendre `config` réussi avant démarrage.
+- **Preuve observée :** `docker compose config` a réussi; la configuration résolue contient PostgreSQL, le port loopback 5432, un volume nommé et un healthcheck.
 
 - [x] 2.2 **CPS-PG-01** — Démarrer et vérifier PostgreSQL
 
@@ -107,6 +113,7 @@
 - **Vérification / acceptation :** conteneur healthy et `pg_isready` confirme l’acceptation de connexions.
 - **Erreurs / diagnostic :** port occupé ou variables erronées; inspecter les logs, ne pas supprimer le volume.
 - **Point d’arrêt :** attendre la preuve de readiness.
+- **Preuve observée :** `docker compose ps postgres` indiquait `Up (healthy)`; les logs annonçaient que PostgreSQL acceptait les connexions et le `pg_isready` exécuté dans le conteneur a retourné `/var/run/postgresql:5432 - accepting connections`.
 
 - [x] 2.3 **CPS-PG-02** — Vérifier la persistance PostgreSQL
 
@@ -119,6 +126,7 @@
 - **Vérification / acceptation :** la ligne-sonde survit au restart.
 - **Erreurs / diagnostic :** vérifier health et nom de DB; ne jamais utiliser `docker compose down -v`.
 - **Point d’arrêt :** attendre preuve de persistance.
+- **Preuve observée :** après `docker compose restart postgres`, la lecture `SELECT id FROM persistence_probe WHERE id = 1` a retourné `1` (une ligne), selon la sortie communiquée. L’insertion idempotente précédente avait répondu `INSERT 0 0`; cette réponse ne prouve pas que cette commande a créé la ligne, la preuve de persistance est la lecture après redémarrage.
 
 - [x] 2.4 **CPS-KC-01** — Ajouter la configuration locale Keycloak
 
@@ -131,6 +139,7 @@
 - **Vérification / acceptation :** config valide et aucun secret personnel versionné.
 - **Erreurs / diagnostic :** conflit de port ou interpolation manquante, signalés par Compose.
 - **Point d’arrêt :** attendre configuration valide avant démarrer.
+- **Preuve observée :** `docker compose config` a réussi pour la configuration Keycloak initiale. Le montage d’import a été ajouté ensuite; la configuration Compose après cet ajout et l’import du realm ne sont pas documentés comme ayant été revalidés.
 
 - [x] 2.5 **CPS-KC-02** — Démarrer et vérifier Keycloak
 
@@ -143,6 +152,7 @@
 - **Vérification / acceptation :** métadonnées JSON du realm master renvoyées.
 - **Erreurs / diagnostic :** démarrage initial lent ou port mapping incorrect; vérifier logs et URL effective.
 - **Point d’arrêt :** attendre discovery valide.
+- **Preuve observée :** le service a été démarré; la discovery du realm `master` a renvoyé des métadonnées OIDC. Les tests ultérieurs ont aussi confirmé l’accès local à Keycloak sur le port 8081.
 
 - [x] 2.6 **CPS-KC-03** — Créer le realm de développement
 
@@ -155,6 +165,7 @@
 - **Vérification / acceptation :** discovery répond et issuer correspond au realm arrêté.
 - **Erreurs / diagnostic :** 404 = faute de realm ou création non sauvegardée; recontrôler la console.
 - **Point d’arrêt :** attendre l’issuer confirmé.
+- **Preuve observée :** le realm `customer-dev` a été créé et sa discovery a retourné l’issuer exact `http://localhost:8081/realms/customer-dev`.
 
 - [x] 2.7 **CPS-KC-04** — Configurer le client public OIDC
 
@@ -167,6 +178,7 @@
 - **Vérification / acceptation :** client public avec PKCE S256 requis; redirect URI exacte `http://127.0.0.1:8765/callback`; issuer et endpoints consignés.
 - **Erreurs / diagnostic :** `invalid_redirect_uri` ou `unauthorized_client`; comparer caractère par caractère le redirect URI et activer le flux standard.
 - **Point d’arrêt :** attendre configuration relue avant rôles.
+- **Preuve observée :** dans `customer-dev`, la console affichait le client activé, public (`Client authentication: Off`), Standard Flow activé, PKCE requis en S256 et l’URI exacte `http://127.0.0.1:8765/callback`. Voir `docs/local-development.md`; l’import Compose n’a pas été testé.
 
 - [x] 2.8 **CPS-KC-05** — Définir inscription et rôles Keycloak
 
@@ -179,6 +191,7 @@
 - **Vérification / acceptation :** aucun utilisateur ne peut s’attribuer OPERATOR à l’inscription; CUSTOMER/OPERATOR attribuables conformément à la règle.
 - **Erreurs / diagnostic :** rôle absent du token = vérifier rôle realm, scope mapper et rôle par défaut.
 - **Point d’arrêt :** attendre preuve visuelle de séparation des rôles.
+- **Preuve observée :** la console a confirmé les rôles realm `CUSTOMER` et `OPERATOR`, `CUSTOMER` seul parmi eux dans les rôles par défaut, l’inscription activée dans `customer-dev` et désactivée dans `master`, et l’absence de sélecteur de rôle dans le formulaire. Un compte d’inscription avait `CUSTOMER` sans `OPERATOR`; un compte distinct a reçu `OPERATOR` par affectation administrateur directe. Voir `docs/local-development.md`.
 
 - [x] 2.9 **CPS-KC-06** — Tester OIDC localement avec PKCE
 
@@ -191,6 +204,7 @@
 - **Vérification / acceptation :** login réussi via S256; claims allowlistés affichés sans jeton; callback et listener local se ferment.
 - **Erreurs / diagnostic :** callback occupé = vérifier port 8765; `invalid_grant` = code expiré ou verifier incorrect; issuer incorrect = comparer discovery. Ne pas désactiver PKCE et ne pas activer de transcript PowerShell pendant ce test.
 - **Point d’arrêt :** attendre sortie expurgée; ne jamais demander ni accepter un JWT.
+- **Preuve observée :** l’exécution réelle sous Windows PowerShell 5.1 a terminé l’échange du code via le callback local; l’issuer affiché correspondait au realm attendu. La sortie indiquait `email_verified: False` et aucun rôle `CUSTOMER`/`OPERATOR` dans l’ID token. Aucune signature JWT n’a été validée par le script; voir `docs/local-development.md` pour le résultat et la réserve sur le mapper de rôles.
 
 ## 3. Reactor Maven et applications minimales
 
@@ -461,7 +475,7 @@
 - **Concepts :** corrélation multi-services et distinction 401/403/404.
 - **Apprenant :** démarre Compose et utilise le helper PKCE avec `-ApiBaseUrl "http://localhost:8080" -CreateProfileName "Customer Demo" -IdempotencyKey "demo-profile-001"`; le bearer token reste en mémoire et les appels n’affichent que statut, Location et corps de réponse; ne partage jamais le JWT.
 - **Fichiers Copilot :** corrections strictement liées à un défaut reproduit.
-- **Commandes :** `docker compose up -d --build`; `docker compose ps`; `docker compose logs --tail 80`; `pwsh -NoProfile -File .\scripts\dev\oidc-pkce-login.ps1 -Issuer "http://localhost:8081/realms/customer-dev" -ClientId "customer-local" -ApiBaseUrl "http://localhost:8080" -CreateProfileName "Customer Demo" -IdempotencyKey "demo-profile-001"`.
+- **Commandes :** `docker compose up -d --build`; `docker compose ps`; `docker compose logs --tail 80`; `powershell.exe -NoProfile -File .\scripts\dev\oidc-pkce-login.ps1 -Issuer "http://localhost:8081/realms/customer-dev" -ClientId "customer-local" -ApiBaseUrl "http://localhost:8080" -CreateProfileName "Customer Demo" -IdempotencyKey "demo-profile-001"` (commande future; les options API devront être implémentées avant cette tâche).
 - **Vérification / acceptation :** création 201/Location, lecture propre, refus OPERATOR à la création, accès croisé 404, Gateway seule entrée exposée.
 - **Erreurs / diagnostic :** 401 issuer/audience, 404 route/masquage, 503 PostgreSQL; corréler les logs sans tokens.
 - **Point d’arrêt :** attendre vos résultats et validation explicite.

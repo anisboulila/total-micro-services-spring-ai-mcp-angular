@@ -249,3 +249,158 @@ le besoin et évalué les alternatives.
 L’existence d’un Gateway ou de deux interfaces dans la référence n’établit pas
 que notre projet doit les reprendre; ces choix ne relèvent pas de la baseline
 Requirements.
+
+## Entretien — Environnement et incrément Customer local
+
+> Les exemples ci-dessous distinguent les choix approuvés, les vérifications
+> rapportées par l'apprenant et les éléments qui restent à confirmer. Le reactor
+> Maven est approuvé mais n'a pas encore été créé.
+
+## Quelle différence entre le client Docker et le daemon?
+
+**Réponse courte**
+`docker --version` vérifie que le client CLI répond; `docker info` interroge le
+daemon et son contexte d'exécution.
+
+**Explication détaillée**
+Le client peut être installé même lorsque Docker Desktop est arrêté ou que le
+contexte cible est indisponible. Il faut donc vérifier les deux. De même, la
+version de Docker Compose ne prouve pas à elle seule qu'une image peut être
+téléchargée et un conteneur exécuté.
+
+**Exemple concret dans notre projet**
+L'inventaire rapporté indiquait Java 21.0.2, Maven 3.9.9, Docker 29.8.2,
+Compose 5.5.1 et OpenSpec 1.14.0; `docker info` confirmait un daemon Linux
+joignable. `docker run --rm hello-world` a ensuite terminé avec succès. Les
+chemins exacts des exécutables n'ont pas été consignés.
+
+**Piège ou erreur fréquente**
+Déduire qu'un environnement est entièrement opérationnel uniquement parce que
+`docker --version` ou `docker compose version` affiche une version.
+
+## Pourquoi choisir un reactor Maven multi-module avant de créer les services?
+
+**Réponse courte**
+Le POM racine coordonne les modules et leurs versions; chaque service garde
+son propre module et son cycle de construction.
+
+**Explication détaillée**
+Un reactor agrège plusieurs projets Maven et permet une construction cohérente
+depuis la racine. Il ne fusionne pas les responsabilités métier et n'impose
+pas de partager les données entre services. Le layout doit être arbitré avant
+de générer les POMs afin d'éviter de créer une structure implicite.
+
+**Exemple concret dans notre projet**
+CPS-DES-01 a approuvé un `pom.xml` agrégateur à la racine, avec
+`customer-service/` et `api-gateway/`, chacun destiné à avoir son POM. Java 21
+et Spring Boot 3.5.x sont retenus. Aucun POM n'est encore créé : CPS-MVN-01
+sera la première tâche d'implémentation du reactor.
+
+**Piège ou erreur fréquente**
+Présenter une structure approuvée sur papier comme un build Maven déjà généré
+ou vérifié.
+
+## Pourquoi publier PostgreSQL uniquement sur la boucle locale?
+
+**Réponse courte**
+Le bind `127.0.0.1:5432:5432` permet un accès depuis l'hôte pour le
+développement, sans publier le port sur toutes les interfaces réseau.
+
+**Explication détaillée**
+Le port du conteneur reste 5432. Les autres conteneurs du réseau Compose
+utilisent le nom DNS du service (`postgres:5432`), tandis qu'un outil local
+comme DBeaver se connecte via `127.0.0.1:5432`. Un volume nommé conserve les
+données au redémarrage du conteneur. Le healthcheck `pg_isready` prouve que la
+base accepte des connexions, pas que chaque schéma applicatif est correct.
+
+**Exemple concret dans notre projet**
+`docker compose config` a réussi. `docker compose ps postgres` a affiché
+`healthy`, et `pg_isready` a retourné que le serveur acceptait les connexions.
+Après `docker compose restart postgres`, la lecture de la sonde
+`persistence_probe` a retourné `id = 1`. Ne pas utiliser `docker compose down
+-v` lors d'une vérification de persistance.
+
+**Piège ou erreur fréquente**
+Confondre un healthcheck réussi avec une preuve de persistance, ou utiliser
+`localhost:5432` depuis un autre conteneur au lieu de `postgres:5432`.
+
+## À quoi sert un realm Keycloak, et pourquoi le client doit-il être dans le bon realm?
+
+**Réponse courte**
+Un realm isole ses utilisateurs, rôles et clients. Le client OIDC doit être
+déclaré dans le realm qui émet l'issuer utilisé par l'application.
+
+**Explication détaillée**
+L'issuer identifie l'autorité qui émet les jetons. Un client créé dans `master`
+n'est pas automatiquement disponible dans `customer-dev`. Une discovery
+correcte ne suffit donc pas : le client doit aussi exister et être activé dans
+le realm attendu.
+
+**Exemple concret dans notre projet**
+Le realm cible est `customer-dev`, avec issuer
+`http://localhost:8081/realms/customer-dev`. `customer-local` y est configuré
+comme client public avec Standard Flow et PKCE S256, et une URI de redirection
+exacte `http://127.0.0.1:8765/callback`. La définition d'import se trouve dans
+`infra/keycloak/realm-dev.json`, mais son import dans un realm persistant n'a
+pas été testé.
+
+**Piège ou erreur fréquente**
+Confondre une définition de client dans un fichier JSON ou dans `master` avec
+la présence effective du client dans le realm `customer-dev`.
+
+## Comment séparer le rôle Customer du rôle opérateur?
+
+**Réponse courte**
+`CUSTOMER` est le rôle realm par défaut pour les nouvelles inscriptions;
+`OPERATOR` n'est jamais attribué par défaut et doit être accordé manuellement
+par un administrateur.
+
+**Explication détaillée**
+Le formulaire public ne doit proposer aucun choix de rôle privilégié. La
+séparation doit être vérifiée dans les affectations effectives : un compte
+inscrit reçoit `CUSTOMER`, tandis qu'un compte opérateur distinct reçoit
+`OPERATOR` par une action administrative. La présence du rôle dans la console
+ne prouve pas qu'il est inclus dans un ID token; cela dépend notamment des
+mappings et scopes du client.
+
+**Exemple concret dans notre projet**
+La console a confirmé les rôles realm `CUSTOMER` et `OPERATOR`, `CUSTOMER`
+seul dans les rôles par défaut, et l'inscription activée dans `customer-dev`
+mais désactivée dans `master`. Un compte de test avait `CUSTOMER` sans
+`OPERATOR`; un compte distinct a reçu `OPERATOR` comme affectation directe.
+Le test PKCE n'a toutefois affiché aucun de ces rôles dans l'ID token; le
+mapper correspondant reste à examiner.
+
+**Piège ou erreur fréquente**
+Croire qu'un rôle n'est pas accordé parce qu'il est absent d'un ID token, sans
+vérifier séparément l'affectation effective et la configuration du mapper de
+rôles pour ce type de jeton.
+
+## Comment PKCE protège-t-il le flux Authorization Code d'un client public?
+
+**Réponse courte**
+Le client crée un `code_verifier` aléatoire et envoie son empreinte S256 comme
+`code_challenge`. Il doit présenter le verifier original pour échanger le code.
+
+**Explication détaillée**
+Le flux démarre avec une requête d'autorisation et revient au callback local.
+`state` lie la réponse à la demande initiée par le client et protège contre
+une réponse injectée. `nonce` lie l'ID token à la demande et réduit le risque
+de rejeu. Le code et le verifier restent en mémoire pendant l'échange; un
+client public ne peut pas garder un secret client de façon confidentielle.
+La validation du nonce ou le décodage de claims ne remplacent pas la validation
+cryptographique du JWT.
+
+**Exemple concret dans notre projet**
+Le script `scripts/dev/oidc-pkce-login.ps1` cible Windows PowerShell 5.1,
+ouvre le navigateur et écoute uniquement sur `127.0.0.1:8765` à
+`/callback`. La commande a terminé l'échange OIDC et affiché l'issuer attendu.
+`email_verified` valait `False` et aucun rôle n'était présent dans l'ID token.
+Le script n'a pas validé la signature; cette tâche revient au Resource Server
+Spring Security ultérieur.
+
+**Piège ou erreur fréquente**
+Dire que le navigateur « utilise un client secret PKCE », ou qu'un ID token
+est fiable parce que son payload a été décodé et que `iss` correspond. Sans
+validation de signature et des contraintes du jeton, les claims ne sont pas
+cryptographiquement authentifiés.
