@@ -96,7 +96,7 @@
 - **Erreurs / diagnostic :** YAML mal indenté ou variable manquante; traiter la ligne indiquée par Compose.
 - **Point d’arrêt :** attendre `config` réussi avant démarrage.
 
-- [ ] 2.2 **CPS-PG-01** — Démarrer et vérifier PostgreSQL
+- [x] 2.2 **CPS-PG-01** — Démarrer et vérifier PostgreSQL
 
 - **Objectif / résultat :** base locale disponible et healthy.
 - **Dépendances :** CPS-DOCKER-01.
@@ -108,7 +108,7 @@
 - **Erreurs / diagnostic :** port occupé ou variables erronées; inspecter les logs, ne pas supprimer le volume.
 - **Point d’arrêt :** attendre la preuve de readiness.
 
-- [ ] 2.3 **CPS-PG-02** — Vérifier la persistance PostgreSQL
+- [x] 2.3 **CPS-PG-02** — Vérifier la persistance PostgreSQL
 
 - **Objectif / résultat :** démontrer la conservation des données au redémarrage.
 - **Dépendances :** CPS-PG-01.
@@ -120,7 +120,7 @@
 - **Erreurs / diagnostic :** vérifier health et nom de DB; ne jamais utiliser `docker compose down -v`.
 - **Point d’arrêt :** attendre preuve de persistance.
 
-- [ ] 2.4 **CPS-KC-01** — Ajouter la configuration locale Keycloak
+- [x] 2.4 **CPS-KC-01** — Ajouter la configuration locale Keycloak
 
 - **Objectif / résultat :** service Keycloak défini de manière reproductible.
 - **Dépendances :** CPS-DOCKER-01.
@@ -132,7 +132,7 @@
 - **Erreurs / diagnostic :** conflit de port ou interpolation manquante, signalés par Compose.
 - **Point d’arrêt :** attendre configuration valide avant démarrer.
 
-- [ ] 2.5 **CPS-KC-02** — Démarrer et vérifier Keycloak
+- [x] 2.5 **CPS-KC-02** — Démarrer et vérifier Keycloak
 
 - **Objectif / résultat :** endpoint discovery OIDC local disponible.
 - **Dépendances :** CPS-KC-01.
@@ -144,7 +144,7 @@
 - **Erreurs / diagnostic :** démarrage initial lent ou port mapping incorrect; vérifier logs et URL effective.
 - **Point d’arrêt :** attendre discovery valide.
 
-- [ ] 2.6 **CPS-KC-03** — Créer le realm de développement
+- [x] 2.6 **CPS-KC-03** — Créer le realm de développement
 
 - **Objectif / résultat :** realm isolé pour l’application.
 - **Dépendances :** CPS-KC-02.
@@ -156,7 +156,7 @@
 - **Erreurs / diagnostic :** 404 = faute de realm ou création non sauvegardée; recontrôler la console.
 - **Point d’arrêt :** attendre l’issuer confirmé.
 
-- [ ] 2.7 **CPS-KC-04** — Configurer le client public OIDC
+- [x] 2.7 **CPS-KC-04** — Configurer le client public OIDC
 
 - **Objectif / résultat :** client local Authorization Code + PKCE S256.
 - **Dépendances :** CPS-KC-03.
@@ -168,7 +168,7 @@
 - **Erreurs / diagnostic :** `invalid_redirect_uri` ou `unauthorized_client`; comparer caractère par caractère le redirect URI et activer le flux standard.
 - **Point d’arrêt :** attendre configuration relue avant rôles.
 
-- [ ] 2.8 **CPS-KC-05** — Définir inscription et rôles Keycloak
+- [x] 2.8 **CPS-KC-05** — Définir inscription et rôles Keycloak
 
 - **Objectif / résultat :** client inscrit comme CUSTOMER; OPERATOR attribué seulement manuellement.
 - **Dépendances :** CPS-KC-04.
@@ -180,14 +180,14 @@
 - **Erreurs / diagnostic :** rôle absent du token = vérifier rôle realm, scope mapper et rôle par défaut.
 - **Point d’arrêt :** attendre preuve visuelle de séparation des rôles.
 
-- [ ] 2.9 **CPS-KC-06** — Tester OIDC localement avec PKCE
+- [x] 2.9 **CPS-KC-06** — Tester OIDC localement avec PKCE
 
-- **Objectif / résultat :** vérifier l’Authorization Code Flow sans frontend applicatif et sans exposer de jeton.
+- **Objectif / résultat :** vérifier l’Authorization Code Flow sous Windows PowerShell 5.1, sans frontend applicatif et sans exposer de jeton.
 - **Dépendances :** CPS-KC-04 et CPS-KC-05.
 - **Concepts :** verifier/challenge S256, `state`, `nonce`, loopback redirect, échange du code.
 - **Apprenant :** lance l’outil local, s’authentifie dans le navigateur et ne partage jamais code/JWT.
 - **Fichiers Copilot :** `scripts/dev/oidc-pkce-login.ps1` et guide local; le script ne sort que `iss`, `sub`, `email_verified` et rôles, jamais jetons, code, verifier ni secrets.
-- **Commandes :** `pwsh -NoProfile -File .\scripts\dev\oidc-pkce-login.ps1 -Issuer "http://localhost:8081/realms/customer-dev" -ClientId "customer-local"`; le script ouvre le navigateur, écoute seulement sur `127.0.0.1:8765`, génère verifier/challenge/state/nonce cryptographiquement, échange le code en mémoire, vérifie state/nonce et n’affirme pas valider localement la signature JWT; cette validation est testée par le Resource Server.
+- **Commandes :** `powershell.exe -NoProfile -File .\scripts\dev\oidc-pkce-login.ps1 -Issuer "http://localhost:8081/realms/customer-dev" -ClientId "customer-local"`; le script cible Windows PowerShell 5.1, ouvre le navigateur, écoute seulement sur `127.0.0.1:8765`, génère verifier/challenge/state/nonce cryptographiquement, échange le code en mémoire, vérifie state/nonce et n’affirme pas valider localement la signature JWT; cette validation est testée par le Resource Server.
 - **Vérification / acceptation :** login réussi via S256; claims allowlistés affichés sans jeton; callback et listener local se ferment.
 - **Erreurs / diagnostic :** callback occupé = vérifier port 8765; `invalid_grant` = code expiré ou verifier incorrect; issuer incorrect = comparer discovery. Ne pas désactiver PKCE et ne pas activer de transcript PowerShell pendant ce test.
 - **Point d’arrêt :** attendre sortie expurgée; ne jamais demander ni accepter un JWT.
