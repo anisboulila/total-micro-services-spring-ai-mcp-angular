@@ -281,24 +281,76 @@ Déduire qu'un environnement est entièrement opérationnel uniquement parce que
 ## Pourquoi choisir un reactor Maven multi-module avant de créer les services?
 
 **Réponse courte**
-Le POM racine coordonne les modules et leurs versions; chaque service garde
-son propre module et son cycle de construction.
+Le POM racine agrège les modules et centralise les règles communes; chaque
+service reste un projet Maven distinct avec son propre artefact.
 
 **Explication détaillée**
-Un reactor agrège plusieurs projets Maven et permet une construction cohérente
-depuis la racine. Il ne fusionne pas les responsabilités métier et n'impose
-pas de partager les données entre services. Le layout doit être arbitré avant
-de générer les POMs afin d'éviter de créer une structure implicite.
+Le reactor est l'ensemble des projets Maven construits depuis un POM
+agrégateur. Le POM racine est aussi le parent des modules, ce qui leur permet
+d'hériter des coordonnées et des réglages communs. `mvn -N validate` limite
+l'exécution au POM courant; `mvn validate` parcourt aussi les modules. La phase
+`validate` vérifie le modèle et le cycle Maven, mais ne compile ni ne démarre
+une application.
 
 **Exemple concret dans notre projet**
-CPS-DES-01 a approuvé un `pom.xml` agrégateur à la racine, avec
-`customer-service/` et `api-gateway/`, chacun destiné à avoir son POM. Java 21
-et Spring Boot 3.5.x sont retenus. Aucun POM n'est encore créé : CPS-MVN-01
-sera la première tâche d'implémentation du reactor.
+CPS-DES-01 a approuvé le `pom.xml` racine et les modules `customer-service/`
+et `api-gateway/`. Le POM racine de CPS-MVN-01 déclare seulement ces deux
+modules; chacun référence le parent via `../pom.xml`. `mvn -N validate` et
+`mvn validate` ont tous deux retourné `BUILD SUCCESS`.
 
 **Piège ou erreur fréquente**
-Présenter une structure approuvée sur papier comme un build Maven déjà généré
-ou vérifié.
+Confondre agrégation et héritage : un parent peut fournir des réglages sans
+agréger de modules, et un agrégateur peut lister des modules sans être leur
+parent. Ici, le POM racine joue les deux rôles. Un `BUILD SUCCESS` de
+`validate` ne prouve pas encore que le code compile ou que l'application
+démarre.
+
+## Pourquoi utiliser la gestion centralisée des dépendances et un BOM?
+
+**Réponse courte**
+Un BOM aligne les versions d'un ensemble de bibliothèques compatibles; les
+modules peuvent ensuite déclarer leurs dépendances sans répéter leurs versions.
+
+**Explication détaillée**
+La section `dependencyManagement` définit les versions qui seront appliquées
+quand un module déclarera une dépendance correspondante; elle n'ajoute pas
+elle-même ces dépendances au classpath. Le parent Spring Boot fournit la
+gestion commune Spring Boot et des plugins. Le BOM Spring Cloud complète cette
+gestion pour les composants Cloud et doit appartenir à une release train
+compatible avec la version Spring Boot retenue.
+
+**Exemple concret dans notre projet**
+Le parent utilise Spring Boot 3.5.10, importe Spring Cloud 2025.0.1 via
+`spring-cloud-dependencies` et fixe Java 21. Les versions sont cohérentes avec
+la ligne Boot 3.5.x / Cloud 2025.0.x déjà présente dans les références du
+dépôt. Les POM enfants ne déclarent encore aucune dépendance fonctionnelle.
+
+**Piège ou erreur fréquente**
+Croire qu'importer un BOM ajoute les bibliothèques à l'application, ou gérer
+manuellement des versions Spring Cloud sans vérifier leur compatibilité avec
+Spring Boot.
+
+## La propriété `java.version` garantit-elle le JDK utilisé par Maven?
+
+**Réponse courte**
+Non. La propriété configure la version Java ciblée par le projet; `mvn
+-version` montre le runtime Java qui exécute Maven.
+
+**Explication détaillée**
+Le parent Spring Boot s'appuie sur `java.version` pour configurer les
+compilateurs gérés par son build. Cette propriété ne sélectionne pas à elle
+seule un JDK dans le terminal. Il faut donc vérifier séparément le runtime
+Maven, puis les builds qui compilent effectivement le code.
+
+**Exemple concret dans notre projet**
+Le parent fixe `<java.version>21</java.version>`. La commande `mvn -version`
+a rapporté Java 21.0.2 et le runtime
+`C:\SpringBOOT\outils\jdk-21`. Les commandes `mvn -N validate` et
+`mvn validate` ont réussi, mais elles n'ont pas encore compilé de code Java.
+
+**Piège ou erreur fréquente**
+Déduire du seul POM que Maven utilise Java 21, ou déduire d'un `BUILD SUCCESS`
+de `validate` que la compilation a été testée.
 
 ## Pourquoi publier PostgreSQL uniquement sur la boucle locale?
 

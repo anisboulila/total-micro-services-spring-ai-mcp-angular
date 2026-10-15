@@ -24,7 +24,7 @@
 - **Point d’arrêt :** attendre le compte rendu avant installation.
 - **Preuve observée :** inventaire rapporté : Java 21.0.2, Maven 3.9.9, Docker 29.8.2, Compose 5.5.1 et OpenSpec 1.14.0; `docker info` confirmait un daemon Linux joignable. Les chemins exacts retournés par `Get-Command` ne sont pas consignés dans le dépôt.
 
-- [ ] 1.2 **CPS-ENV-02** — Installer ou réparer Java 21
+- [x] 1.2 **CPS-ENV-02** — Installer ou réparer Java 21
 
 - **Objectif / résultat :** avoir un JDK 21 sélectionné par le nouveau terminal.
 - **Dépendances :** CPS-ENV-01, uniquement si nécessaire.
@@ -35,8 +35,9 @@
 - **Vérification / acceptation :** version sélectionnée 21 et chemin correspondant au JDK attendu.
 - **Erreurs / diagnostic :** plusieurs Java dans le `PATH`; vérifier `where.exe java`, corriger l’ordre du `PATH`, ouvrir un nouveau terminal.
 - **Point d’arrêt :** attendre la preuve Java 21 avant la suite.
+- **Preuve observée :** `mvn -version` a rapporté Java 21.0.2, Oracle Corporation, runtime `C:\SpringBOOT\outils\jdk-21`.
 
-- [ ] 1.3 **CPS-ENV-03** — Installer ou réparer Maven
+- [x] 1.3 **CPS-ENV-03** — Installer ou réparer Maven
 
 - **Objectif / résultat :** disposer d’un Maven fonctionnel utilisant Java 21.
 - **Dépendances :** CPS-ENV-01, CPS-ENV-02 si Maven n’est pas disponible.
@@ -47,6 +48,7 @@
 - **Vérification / acceptation :** Maven répond et affiche Java 21.
 - **Erreurs / diagnostic :** `mvn` non reconnu = `PATH`; Java incorrect = vérifier `JAVA_HOME` et le terminal.
 - **Point d’arrêt :** attendre la preuve Maven avant la suite.
+- **Preuve observée :** `mvn -version` a répondu et rapporté Java 21.0.2 pour le runtime Maven; le numéro de version Maven n'a pas été recopié dans le résultat partagé ici.
 
 - [ ] 1.4 **CPS-ENV-04** — Installer et démarrer Docker Desktop
 
@@ -208,17 +210,18 @@
 
 ## 3. Reactor Maven et applications minimales
 
-- [ ] 3.1 **CPS-MVN-01** — Créer le reactor Maven
+- [x] 3.1 **CPS-MVN-01** — Créer le reactor Maven
 
 - **Objectif / résultat :** parent Maven valide déclarant seulement Customer et Gateway.
 - **Dépendances :** CPS-DES-01, CPS-ENV-02 et CPS-ENV-03.
 - **Concepts :** parent POM, modules, version Java, gestion centralisée.
 - **Apprenant :** lit le POM racine et lance Maven.
 - **Fichiers Copilot :** `pom.xml` racine et POM de modules minimaux.
-- **Commandes :** `mvn -N validate`.
+- **Commandes :** `mvn -version`; `mvn -N validate`; `mvn validate`.
 - **Vérification / acceptation :** POM valide et modules référencés; Java 21; pas de dépendances Account/Kafka/Redis/AI.
 - **Erreurs / diagnostic :** POM XML invalide ou version non résolue; suivre la première erreur Maven.
-- **Point d’arrêt :** attendre validation parent.
+- **Point d’arrêt :** ne pas commencer CPS-APP-01 avant validation explicite.
+- **Preuve observée :** `mvn -N validate` et `mvn validate` ont chacun retourné `BUILD SUCCESS`; `mvn -version` a confirmé Java 21.0.2. Les POM déclarent uniquement les modules `customer-service` et `api-gateway`, sans dépendances applicatives hors périmètre.
 
 - [ ] 3.2 **CPS-APP-01** — Créer et lancer Customer minimal
 

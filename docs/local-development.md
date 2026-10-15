@@ -22,6 +22,28 @@ openspec --version
 docker compose config
 ```
 
+### Maven reactor validation
+
+From the repository root, inspect the Java runtime selected by Maven and
+validate the reactor:
+
+```powershell
+mvn -version
+mvn -N validate
+mvn validate
+```
+
+`mvn -N validate` validates only the root POM. `mvn validate` traverses the
+root project and its declared modules, validating their POMs and parent
+relationships. These commands do not compile or run application code. The
+root POM sets `java.version` to 21, inherits Spring Boot 3.5.10 dependency and
+plugin management, and imports the Spring Cloud 2025.0.1 BOM.
+
+During CPS-MVN-01, `mvn -N validate` and `mvn validate` both returned
+`BUILD SUCCESS`. The shared `mvn -version` result reported Java 21.0.2 from
+`C:\SpringBOOT\outils\jdk-21`; the Maven version number was not included in
+that result.
+
 Docker CLI and Docker daemon checks are different: `docker --version` reports
 the client, while `docker info` must be able to contact the server/daemon.
 `docker compose config` resolves the Compose configuration; it does not start
