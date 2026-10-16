@@ -95,6 +95,44 @@ During CPS-APP-02, the test command returned `BUILD SUCCESS`; startup reported
 `Started ApiGatewayApplication in 1.904 seconds`; the health request returned
 HTTP 200 and `{"status":"UP"}`, and the process stopped after `Ctrl+C`.
 
+### Build and run the applications with Docker Compose
+
+From the repository root, validate the Compose file, build both images and
+start the two applications:
+
+```powershell
+docker compose config
+docker compose up -d --build customer-service api-gateway
+docker compose ps
+docker compose logs --tail 50 customer-service api-gateway
+```
+
+The Dockerfiles use the repository root as the build context so Maven can read
+the parent POM and both module POMs. Each is a multi-stage build: Maven builds
+the selected application with Java 21, then a Java 21 JRE image runs only its
+executable JAR as a non-root UID. `.dockerignore` excludes local `.env` files,
+Git metadata and Maven `target` directories from the context.
+
+Compose's default network provides DNS names matching the service names.
+Customer listens on container port 8082 and is not published on the host;
+Gateway listens on container port 8080 and is published only on
+`127.0.0.1:8080`. The Compose healthchecks call each container's own Actuator
+health endpoint with Alpine's `wget`. No `depends_on` or PostgreSQL/Keycloak
+connection settings are needed yet because neither minimal application uses
+those services at startup.
+
+Wait for `healthy` in `docker compose ps`; `Up` alone means only that the
+container process is running. The current images are built from these Docker
+contexts and can be stopped with `docker compose stop customer-service
+api-gateway`.
+
+During CPS-APP-03, the learner reported that `docker compose config` displayed
+the resolved configuration without error and that `docker compose up -d
+--build customer-service api-gateway` started the images. `docker compose ps`
+showed both applications `Up (healthy)`, Customer with only `8082/tcp`, and
+Gateway published as `127.0.0.1:8080->8080/tcp`; the logs showed `Started` for
+both applications.
+
 Docker CLI and Docker daemon checks are different: `docker --version` reports
 the client, while `docker info` must be able to contact the server/daemon.
 `docker compose config` resolves the Compose configuration; it does not start

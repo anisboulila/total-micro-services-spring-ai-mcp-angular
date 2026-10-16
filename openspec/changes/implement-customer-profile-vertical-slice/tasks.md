@@ -249,7 +249,7 @@
 - **Point d’arrêt :** ne pas commencer CPS-APP-03 avant validation explicite.
 - **Preuve observée :** `mvn -pl api-gateway -am test` a retourné `BUILD SUCCESS`; `mvn -pl api-gateway spring-boot:run` a affiché `Started ApiGatewayApplication in 1.904 seconds`; `Invoke-WebRequest http://localhost:8080/actuator/health` a retourné HTTP 200 et `{"status":"UP"}`. Gateway s'est arrêtée après `Ctrl+C`.
 
-- [ ] 3.4 **CPS-APP-03** — Conteneuriser les deux applications
+- [x] 3.4 **CPS-APP-03** — Conteneuriser les deux applications
 
 - **Objectif / résultat :** services Customer et Gateway démarrent dans le réseau Compose.
 - **Dépendances :** CPS-APP-01, CPS-APP-02, CPS-PG-01, CPS-KC-02.
@@ -259,7 +259,8 @@
 - **Commandes :** `docker compose config`; `docker compose up -d --build customer-service api-gateway`; `docker compose ps`; `docker compose logs --tail 50 customer-service api-gateway`.
 - **Vérification / acceptation :** deux applications healthy; Customer n’est pas publié directement sur le host.
 - **Erreurs / diagnostic :** URL interne doit utiliser nom Compose (`postgres`, `keycloak`), non `localhost`; examiner logs.
-- **Point d’arrêt :** attendre readiness avant Flyway ou routage.
+- **Point d’arrêt :** arrêter ici; ne pas commencer Flyway ni le routage Gateway.
+- **Preuve observée :** `docker compose config` a affiché la configuration résolue sans erreur signalée; `docker compose up -d --build customer-service api-gateway` a démarré les conteneurs. `docker compose ps` indiquait Customer et Gateway `Up (healthy)`, Customer avec `8082/tcp` sans publication hôte et Gateway avec `127.0.0.1:8080->8080/tcp`. Les journaux rapportés contenaient les messages `Started` des deux applications.
 
 ## 4. PostgreSQL, Flyway et modèle
 

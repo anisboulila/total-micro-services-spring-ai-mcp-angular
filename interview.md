@@ -78,6 +78,83 @@ Ajouter `spring-boot-starter-web` par habitude dans une Gateway réactive, ou
 conclure que le healthcheck `UP` prouve que des routes vers Customer sont
 configurées et fonctionnelles.
 
+## Quelle différence entre un Dockerfile, une image et un conteneur?
+
+**Réponse courte**
+Le Dockerfile décrit la construction; l'image est le résultat réutilisable;
+le conteneur est une instance de cette image en cours d'exécution.
+
+**Explication détaillée**
+Un build multi-stage sépare les outils nécessaires à la compilation du
+runtime. La première étape peut contenir Maven et un JDK; l'étape finale ne
+contient que le JRE et l'artefact exécutable. Cela réduit le contenu de l'image
+de runtime et évite d'y embarquer les sources ou Maven. Exécuter l'application
+avec un UID non privilégié réduit les permissions du processus dans le
+conteneur.
+
+**Exemple concret dans notre projet**
+`customer-service/Dockerfile` et `api-gateway/Dockerfile` utilisent chacun
+Maven 3.9.9 avec Java 21 pour construire le module depuis le reactor racine,
+puis Eclipse Temurin JRE 21 pour lancer le JAR correspondant. Les noms des
+artefacts sont fondés sur les `artifactId` Maven (`customer-service` et
+`api-gateway`); les copies tolèrent leur version Maven par un motif ciblé. Le
+`.dockerignore` exclut notamment `.env`, `.git` et `target`.
+
+**Piège ou erreur fréquente**
+Confondre `EXPOSE` avec une publication sur l'hôte, copier le dépôt complet
+dans l'image finale, ou lancer l'application en tant que root sans raison.
+
+## Comment Compose relie les services et distingue les ports?
+
+**Réponse courte**
+Les services d'un réseau Compose se joignent par leur nom DNS et leur port
+interne. `ports` publie un port sur l'hôte; `expose` ne crée pas de publication
+hôte.
+
+**Explication détaillée**
+Compose crée un réseau par défaut où les noms de services sont résolus par
+DNS. Depuis un conteneur, `localhost` désigne ce conteneur lui-même, pas un
+autre service. Une publication relie un port de l'hôte à un port du conteneur;
+elle n'est pas nécessaire pour que deux services du réseau communiquent.
+
+**Exemple concret dans notre projet**
+`customer-service` écoute sur le port interne `8082` et n'a aucune entrée
+`ports`; `api-gateway` écoute sur `8080` et publie
+`127.0.0.1:8080:8080`. Les services PostgreSQL et Keycloak gardent leurs noms
+Compose `postgres` et `keycloak`. Les applications minimales ne les appellent
+pas encore, donc aucune URL de connexion n'est ajoutée.
+
+**Piège ou erreur fréquente**
+Utiliser `localhost` pour joindre PostgreSQL depuis Customer, publier
+inutilement le port Customer sur l'hôte, ou considérer `EXPOSE` comme une
+règle de pare-feu.
+
+## Pourquoi un healthcheck Compose et quand utiliser `depends_on`?
+
+**Réponse courte**
+Un healthcheck mesure la readiness applicative; `depends_on` avec une
+condition de santé ne convient que lorsqu'un service dépend réellement d'un
+autre au démarrage.
+
+**Explication détaillée**
+L'état `running` signifie que le processus du conteneur tourne, pas qu'il
+accepte les requêtes. Un healthcheck périodique peut tester une réponse HTTP
+réelle et faire passer le conteneur à `healthy`. `depends_on` peut ordonner le
+démarrage et attendre un état `healthy`, mais ne remplace ni les retries
+applicatifs ni la résilience après le démarrage.
+
+**Exemple concret dans notre projet**
+Les deux images sondent leur propre endpoint Actuator `/actuator/health` avec
+`wget`; les conteneurs sont devenus `Up (healthy)`. Il n'y a pas de
+`depends_on` vers PostgreSQL ou Keycloak, car les squelettes ne s'y connectent
+pas au démarrage. Customer est joignable sur `customer-service:8082` dans le
+réseau même sans port hôte publié.
+
+**Piège ou erreur fréquente**
+Déduire la readiness de `Up`, ajouter des dépendances de démarrage qui ne
+correspondent à aucun besoin, ou utiliser un outil absent de l'image dans le
+healthcheck.
+
 ## Quel est le rôle d'Eureka dans cette référence?
 
 **Réponse courte**  

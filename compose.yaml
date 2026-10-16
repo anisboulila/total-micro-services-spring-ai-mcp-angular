@@ -30,6 +30,32 @@ services:
       - keycloak-data:/opt/keycloak/data
       - ./infra/keycloak:/opt/keycloak/data/import:ro
 
+  customer-service:
+    build:
+      context: .
+      dockerfile: customer-service/Dockerfile
+    expose:
+      - "8082"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8082/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
 volumes:
   customer-postgres-data:
   keycloak-data:

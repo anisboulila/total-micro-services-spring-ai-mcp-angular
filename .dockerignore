@@ -1,0 +1,11 @@
+.git
+**/.git
+.env
+.env.*
+**/.env
+**/.env.*
+target
+**/target
+.idea
+**/.idea
+**/node_modules
