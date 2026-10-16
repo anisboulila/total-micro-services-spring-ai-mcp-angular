@@ -352,6 +352,78 @@ a rapporté Java 21.0.2 et le runtime
 Déduire du seul POM que Maven utilise Java 21, ou déduire d'un `BUILD SUCCESS`
 de `validate` que la compilation a été testée.
 
+## Quel est le rôle de la classe principale Spring Boot?
+
+**Réponse courte**
+Elle active la configuration automatique et le scan des composants, puis
+`SpringApplication.run()` démarre l'application et crée son contexte Spring.
+
+**Explication détaillée**
+`@SpringBootApplication` regroupe la configuration Spring Boot, l'auto-
+configuration basée sur le classpath et le scan des composants depuis le
+package de la classe. `SpringApplication.run()` prépare l'environnement,
+construit le contexte d'application et déclenche le cycle de vie des beans.
+Les composants placés dans les packages enfants sont donc découverts par
+défaut.
+
+**Exemple concret dans notre projet**
+`customer-service/src/main/java/com/anisboulila/customerservice/CustomerServiceApplication.java`
+est le point d'entrée du module. La commande `mvn -pl customer-service
+spring-boot:run` a démarré cette classe; les logs rapportés contenaient
+`Started CustomerServiceApplication in 1.536 seconds`.
+
+**Piège ou erreur fréquente**
+Placer des composants hors du package scanné et croire qu'ils seront
+automatiquement détectés, ou confondre le contexte Spring avec le serveur HTTP.
+
+## Que vérifie un test `@SpringBootTest`?
+
+**Réponse courte**
+Il charge le contexte Spring Boot pour vérifier que l'application peut
+initialiser sa configuration et ses beans.
+
+**Explication détaillée**
+Le test de contexte détecte notamment les erreurs de configuration et
+d'auto-configuration qui empêchent le démarrage. Par défaut, `@SpringBootTest`
+utilise un environnement web simulé : il ne prouve pas à lui seul qu'un vrai
+serveur écoute sur le port attendu ni qu'une requête HTTP fonctionne. Il faut
+une vérification séparée pour ces critères.
+
+**Exemple concret dans notre projet**
+`CustomerServiceApplicationTests.contextLoads()` est un test sans logique
+métier. `mvn -pl customer-service -am test` a retourné `BUILD SUCCESS`; le
+healthcheck HTTP a ensuite confirmé séparément le serveur réel.
+
+**Piège ou erreur fréquente**
+Traiter le succès du test de contexte comme une preuve de disponibilité réseau,
+ou y connecter une base partagée alors que ce squelette n'en a pas besoin.
+
+## À quoi servent le serveur embarqué et Spring Boot Actuator?
+
+**Réponse courte**
+Le starter Web apporte un serveur HTTP embarqué; Actuator fournit des endpoints
+de diagnostic, dont `/actuator/health`.
+
+**Explication détaillée**
+Le serveur embarqué permet de lancer l'application avec une seule commande,
+sans installer ni déployer un serveur d'applications séparé. La propriété
+`server.port` fixe le port d'écoute. Actuator expose des informations
+opérationnelles; par défaut, l'endpoint de santé est exposé par HTTP, tandis
+que les autres endpoints ne sont pas ouverts par défaut. Une réponse `UP`
+indique que les indicateurs de santé actifs sont satisfaits; elle ne prouve
+pas que des fonctionnalités métier existent.
+
+**Exemple concret dans notre projet**
+`customer-service/pom.xml` ajoute `spring-boot-starter-web` et
+`spring-boot-starter-actuator`; `application.properties` fixe le port `8082`.
+`Invoke-WebRequest http://localhost:8082/actuator/health` a retourné HTTP 200
+et `{"status":"UP"}`. L'application a ensuite été arrêtée avec `Ctrl+C`.
+
+**Piège ou erreur fréquente**
+Exposer tous les endpoints Actuator sans besoin ni contrôle d'accès, ou
+interpréter `UP` comme preuve que PostgreSQL ou les opérations métier sont
+disponibles. Ce squelette n'a pas de dépendance PostgreSQL.
+
 ## Pourquoi publier PostgreSQL uniquement sur la boucle locale?
 
 **Réponse courte**

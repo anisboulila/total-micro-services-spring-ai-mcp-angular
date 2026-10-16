@@ -223,7 +223,7 @@
 - **Point d’arrêt :** ne pas commencer CPS-APP-01 avant validation explicite.
 - **Preuve observée :** `mvn -N validate` et `mvn validate` ont chacun retourné `BUILD SUCCESS`; `mvn -version` a confirmé Java 21.0.2. Les POM déclarent uniquement les modules `customer-service` et `api-gateway`, sans dépendances applicatives hors périmètre.
 
-- [ ] 3.2 **CPS-APP-01** — Créer et lancer Customer minimal
+- [x] 3.2 **CPS-APP-01** — Créer et lancer Customer minimal
 
 - **Objectif / résultat :** application Customer vide démarre et répond au healthcheck local.
 - **Dépendances :** CPS-MVN-01.
@@ -233,7 +233,8 @@
 - **Commandes :** `mvn -pl customer-service -am test`; dans un terminal : `mvn -pl customer-service spring-boot:run`; second terminal : `Invoke-WebRequest http://localhost:8082/actuator/health`.
 - **Vérification / acceptation :** test contexte vert et health répond; arrêt propre; aucun appel PostgreSQL métier requis.
 - **Erreurs / diagnostic :** port déjà utilisé = `Get-NetTCPConnection -LocalPort 8082`; classe principale/config = examiner rapport Surefire/logs.
-- **Point d’arrêt :** attendre preuve du lancement Customer.
+- **Point d’arrêt :** ne pas commencer CPS-APP-02 avant validation explicite.
+- **Preuve observée :** `mvn -pl customer-service -am test` a retourné `BUILD SUCCESS`; `mvn -pl customer-service spring-boot:run` a affiché `Started CustomerServiceApplication in 1.536 seconds`; `Invoke-WebRequest http://localhost:8082/actuator/health` a retourné HTTP 200 et `{"status":"UP"}`. L'application s'est arrêtée après `Ctrl+C`.
 
 - [ ] 3.3 **CPS-APP-02** — Créer et lancer Gateway minimale
 

@@ -44,6 +44,32 @@ During CPS-MVN-01, `mvn -N validate` and `mvn validate` both returned
 `C:\SpringBOOT\outils\jdk-21`; the Maven version number was not included in
 that result.
 
+### Run the minimal Customer application
+
+From the repository root, run the module test and start Customer:
+
+```powershell
+mvn -pl customer-service -am test
+mvn -pl customer-service spring-boot:run
+```
+
+In a second terminal, check the Actuator health endpoint:
+
+```powershell
+Invoke-WebRequest http://localhost:8082/actuator/health
+```
+
+The expected response is HTTP 200 with JSON `{"status":"UP"}`. Stop the
+application with `Ctrl+C` in the Maven terminal. This minimal application
+does not require PostgreSQL to start. If startup reports that port 8082 is
+already in use, inspect the listener with
+`Get-NetTCPConnection -LocalPort 8082` before taking any action.
+
+During CPS-APP-01, the test command returned `BUILD SUCCESS`; startup reported
+`Started CustomerServiceApplication in 1.536 seconds`; the health request
+returned HTTP 200 and `{"status":"UP"}`, and the process stopped after
+`Ctrl+C`.
+
 Docker CLI and Docker daemon checks are different: `docker --version` reports
 the client, while `docker info` must be able to contact the server/daemon.
 `docker compose config` resolves the Compose configuration; it does not start
