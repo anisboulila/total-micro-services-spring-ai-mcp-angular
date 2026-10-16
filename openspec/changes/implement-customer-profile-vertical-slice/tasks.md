@@ -236,7 +236,7 @@
 - **Point d’arrêt :** ne pas commencer CPS-APP-02 avant validation explicite.
 - **Preuve observée :** `mvn -pl customer-service -am test` a retourné `BUILD SUCCESS`; `mvn -pl customer-service spring-boot:run` a affiché `Started CustomerServiceApplication in 1.536 seconds`; `Invoke-WebRequest http://localhost:8082/actuator/health` a retourné HTTP 200 et `{"status":"UP"}`. L'application s'est arrêtée après `Ctrl+C`.
 
-- [ ] 3.3 **CPS-APP-02** — Créer et lancer Gateway minimale
+- [x] 3.3 **CPS-APP-02** — Créer et lancer Gateway minimale
 
 - **Objectif / résultat :** application Gateway vide démarre et répond au healthcheck local.
 - **Dépendances :** CPS-MVN-01.
@@ -246,7 +246,8 @@
 - **Commandes :** `mvn -pl api-gateway -am test`; `mvn -pl api-gateway spring-boot:run`; second terminal : `Invoke-WebRequest http://localhost:8080/actuator/health`.
 - **Vérification / acceptation :** test de contexte vert, health répond et arrêt propre.
 - **Erreurs / diagnostic :** conflit MVC/WebFlux ou port occupé; lire stacktrace, vérifier `Get-NetTCPConnection -LocalPort 8080`.
-- **Point d’arrêt :** attendre preuve Gateway avant Compose applicatif.
+- **Point d’arrêt :** ne pas commencer CPS-APP-03 avant validation explicite.
+- **Preuve observée :** `mvn -pl api-gateway -am test` a retourné `BUILD SUCCESS`; `mvn -pl api-gateway spring-boot:run` a affiché `Started ApiGatewayApplication in 1.904 seconds`; `Invoke-WebRequest http://localhost:8080/actuator/health` a retourné HTTP 200 et `{"status":"UP"}`. Gateway s'est arrêtée après `Ctrl+C`.
 
 - [ ] 3.4 **CPS-APP-03** — Conteneuriser les deux applications
 

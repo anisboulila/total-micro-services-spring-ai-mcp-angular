@@ -46,6 +46,38 @@ Les frontends utilisent `localhost:9999` avec les préfixes
 `DiscoveryClientRouteDefinitionLocator`, mais le routage effectif n'a pas été
 testé.
 
+## Pourquoi choisir Spring Cloud Gateway avec WebFlux et Reactor Netty?
+
+**Réponse courte**
+Cette combinaison fournit un Gateway réactif et non bloquant. Elle est
+distincte du modèle Servlet de Spring MVC; les deux starters ne doivent pas
+être mélangés dans cette application.
+
+**Explication détaillée**
+Une API Gateway fournit un point d'entrée et peut appliquer des filtres et
+acheminer les requêtes vers les services. Spring Cloud Gateway Server WebFlux
+repose sur Spring WebFlux, Reactor et le serveur embarqué Reactor Netty. Ce
+modèle traite les entrées/sorties de manière asynchrone et non bloquante.
+Spring MVC utilise le modèle Servlet, habituellement avec Tomcat et une
+architecture différente. Ajouter `spring-boot-starter-web` au Gateway peut
+introduire Spring MVC et faire sélectionner une application Servlet ou causer
+des incompatibilités. Un code bloquant exécuté sur les event loops réactives
+peut aussi annuler le bénéfice du modèle non bloquant.
+
+**Exemple concret dans notre projet**
+`api-gateway/pom.xml` déclare
+`spring-cloud-starter-gateway-server-webflux`, dont la version vient du BOM
+Spring Cloud 2025.0.1 géré par le parent Spring Boot 3.5.10. Il n'ajoute pas
+`spring-boot-starter-web`; `application.properties` fixe le port `8080`.
+Pour CPS-APP-02, le test de contexte a réussi, l'application a démarré et le
+healthcheck a retourné HTTP 200 avec `{"status":"UP"}`. Aucun routage métier
+n'est encore configuré.
+
+**Piège ou erreur fréquente**
+Ajouter `spring-boot-starter-web` par habitude dans une Gateway réactive, ou
+conclure que le healthcheck `UP` prouve que des routes vers Customer sont
+configurées et fonctionnelles.
+
 ## Quel est le rôle d'Eureka dans cette référence?
 
 **Réponse courte**  

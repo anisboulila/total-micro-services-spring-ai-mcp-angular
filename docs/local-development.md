@@ -70,6 +70,31 @@ During CPS-APP-01, the test command returned `BUILD SUCCESS`; startup reported
 returned HTTP 200 and `{"status":"UP"}`, and the process stopped after
 `Ctrl+C`.
 
+### Run the minimal API Gateway
+
+From the repository root, run the module test and start Gateway:
+
+```powershell
+mvn -pl api-gateway -am test
+mvn -pl api-gateway spring-boot:run
+```
+
+In a second terminal, check the Actuator health endpoint:
+
+```powershell
+Invoke-WebRequest http://localhost:8080/actuator/health
+```
+
+The expected response is HTTP 200 with JSON `{"status":"UP"}`. Stop the
+application with `Ctrl+C` in the Maven terminal. This initial Gateway has no
+business routes. If startup reports that port 8080 is already in use, inspect
+the listener with `Get-NetTCPConnection -LocalPort 8080` before taking any
+action.
+
+During CPS-APP-02, the test command returned `BUILD SUCCESS`; startup reported
+`Started ApiGatewayApplication in 1.904 seconds`; the health request returned
+HTTP 200 and `{"status":"UP"}`, and the process stopped after `Ctrl+C`.
+
 Docker CLI and Docker daemon checks are different: `docker --version` reports
 the client, while `docker info` must be able to contact the server/daemon.
 `docker compose config` resolves the Compose configuration; it does not start
