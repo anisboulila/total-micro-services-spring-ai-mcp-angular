@@ -551,9 +551,9 @@ sans dépendre d'une génération implicite du schéma par Hibernate ou
 **Exemple concret dans notre projet**
 La datasource et Flyway sont configurés dans `customer-service`; la migration
 de preuve `V1__flyway_proof.sql` se trouve uniquement dans les ressources de
-test et exécute `SELECT 1`. Cela préserve le `V1__create_customer.sql` métier
-prévu par CPS-DB-02. Les tests ont vérifié que la version `1` est enregistrée
-avec succès dans `flyway_schema_history`.
+test et exécute `SELECT 1`. La migration métier `V1__create_customer.sql`
+réside dans les ressources principales et crée le schéma Customer. Les tests
+vérifient que la version `1` apparaît dans `flyway_schema_history`.
 
 **Piège ou erreur fréquente**
 Modifier une migration déjà appliquée, supposer qu'un fichier SQL présent a
@@ -608,6 +608,34 @@ PostgreSQL 17 jetable, sans modifier `customer_db`.
 Présenter un schéma de test dans une base partagée comme une base isolée, ou
 affirmer qu'un test est passé alors qu'il n'a fait que compiler les
 dépendances.
+
+## Comment les contraintes de la table Customer protègent-elles les données?
+
+**Réponse courte**
+La migration PostgreSQL impose l'identité unique par `sub`, l'unicité de
+l'e-mail après trim et mise en minuscules, ainsi que les limites du nom.
+
+**Explication détaillée**
+`V1__create_customer.sql` crée une clé `UUID` générée par PostgreSQL, un
+`sub` non nul et unique, un nom limité à 120 caractères et non vide après
+trim, un e-mail non nul et `created_at` obligatoire de type `TIMESTAMPTZ`.
+L'index unique `lower(btrim(email))` applique l'unicité indépendamment de la
+casse et des espaces périphériques. Il protège aussi contre les courses
+concurrentes, contrairement à une vérification préalable faite uniquement
+dans le code applicatif.
+
+**Exemple concret dans notre projet**
+`CustomerSchemaComposePostgresIT` exécute la vraie migration contre PostgreSQL
+Compose dans le schéma dédié `cps_customer_schema` de `customer_db`. Il vérifie
+la ligne Flyway, les colonnes et l'index, une insertion valide, puis le rejet
+des doublons `sub`/e-mail et des noms invalides. Les transactions de test sont
+annulées; le schéma et la table restent inspectables.
+
+**Piège ou erreur fréquente**
+Confondre le nom de la base (`customer_db`) avec le schéma (`public` ou
+`cps_customer_schema`), croire que la base partagée a été réinitialisée, ou
+croire qu'une vérification applicative seule remplace une contrainte unique
+PostgreSQL.
 
 ## Comment Flyway fait-il échouer le démarrage si une migration est invalide?
 

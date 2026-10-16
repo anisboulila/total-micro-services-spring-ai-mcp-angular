@@ -277,17 +277,18 @@
 - **Point d’arrêt :** arrêter ici; ne pas commencer CPS-DB-02.
 - **Preuve observée :** `mvn -pl customer-service -am verify` a retourné `BUILD SUCCESS` pour la compilation et le packaging. `docker compose up -d postgres` a répondu `Running`; `docker compose ps postgres` indiquait `Up 45 hours (healthy)` et `127.0.0.1:5432->5432/tcp`. Le profil `flyway-compose-postgres` a retourné `BUILD SUCCESS` après avoir appliqué et vérifié la migration `V1` dans le schéma dédié `cps_flyway_probe` de la base partagée `customer_db`; cette vérification n'est pas une base isolée et le schéma/historique persistent. Le profil `flyway-testcontainers` a aussi retourné `BUILD SUCCESS` sur un PostgreSQL 17 jetable; le test valide l'historique et vérifie qu'une migration SQL invalide fait échouer le contexte avec une cause Flyway, sans toucher à la base Compose.
 
-- [ ] 4.2 **CPS-DB-02** — Créer la table Customer et ses contraintes
+- [x] 4.2 **CPS-DB-02** — Créer la table Customer et ses contraintes
 
 - **Objectif / résultat :** schéma propre au service avec unicité prouvée.
 - **Dépendances :** CPS-DB-01.
 - **Concepts :** types PostgreSQL, contrainte unique, UTC, e-mail canonique.
 - **Apprenant :** lit le SQL et examine les tests réels PostgreSQL.
 - **Fichiers Copilot :** `V1__create_customer.sql` et test de migration.
-- **Commandes :** `mvn -pl customer-service -am verify`.
+- **Commandes :** `mvn -pl customer-service -am -Pflyway-compose-postgres verify`.
 - **Vérification / acceptation :** `id`, `sub`, `name`, email canonique et `created_at`; unicité de `sub` et e-mail insensible à la casse appliquée et inspectable sur PostgreSQL local; Testcontainers revalide ces contraintes dans CPS-TEST-02.
 - **Erreurs / diagnostic :** ne pas valider avec H2; vérifier index/canonicalisation avec deux emails dont la casse diffère.
-- **Point d’arrêt :** attendre contraintes prouvées.
+- **Preuve observée :** l’apprenant a exécuté la commande avec le profil `flyway-compose-postgres` et rapporté `BUILD SUCCESS`. Le profil Failsafe exécute les tests PostgreSQL Compose de preuve Flyway et de schéma Customer. `CustomerSchemaComposePostgresIT` vérifie l’application de V1, les cinq colonnes, l’index unique `lower(btrim(email))`, une insertion valide et la génération de l’UUID, le rejet d’un `sub` dupliqué, d’un e-mail dupliqué malgré la casse/les espaces, et de noms vides ou trop longs. Le test utilise le schéma persistant `cps_customer_schema` dans la base partagée `customer_db`; il ne réinitialise ni ne supprime la base. Les insertions de test sont annulées par transaction; la table et `flyway_schema_history` restent présentes. Les contraintes seront revalidées avec Testcontainers en CPS-TEST-02.
+- **Point d’arrêt :** attendre avant de commencer CPS-DOM-01.
 
 - [ ] 4.3 **CPS-DOM-01** — Ajouter le modèle et le repository Customer
 

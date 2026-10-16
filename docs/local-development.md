@@ -141,8 +141,8 @@ both applications.
 
 ### Verify Flyway migrations
 
-The default Maven verification compiles and packages Customer. The two
-integration profiles below run the migration proof against PostgreSQL:
+The default Maven verification compiles and packages Customer. The opt-in
+integration profiles below run PostgreSQL checks:
 
 ```powershell
 mvn -pl customer-service -am verify
@@ -153,23 +153,48 @@ mvn -pl customer-service -am -Pflyway-testcontainers verify
 ```
 
 `flyway-compose-postgres` connects from the host to the Compose-published
-PostgreSQL endpoint and applies the test-only migration in schema
-`cps_flyway_probe` inside the shared `customer_db`. This is not an isolated
-database; the schema and `flyway_schema_history` remain after the test. The
-migration contains only `SELECT 1`, and the test does not create or modify
-business tables.
+PostgreSQL endpoint. It runs two integration tests in the shared `customer_db`:
+the test-only `SELECT 1` migration in `cps_flyway_probe`, and the business
+migration `V1__create_customer.sql` in the dedicated schema
+`cps_customer_schema`. Neither schema is an isolated database. The schemas
+and their `flyway_schema_history` tables persist after the tests; the Customer
+test inserts are rolled back by their test transactions and it never resets
+or drops the database.
+
+The Customer table can be inspected in DBeaver under
+`customer_db > Schemas > cps_customer_schema > Tables > customer`. To inspect
+its columns or contents with SQL:
+
+```sql
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'cps_customer_schema' AND table_name = 'customer'
+ORDER BY ordinal_position;
+
+SELECT * FROM cps_customer_schema.customer;
+```
+
+The integration test checks the successful Flyway history row, the five
+columns and unique email index, successful insertion and generated UUID, and
+rejection of duplicate `sub`, case/space-equivalent email, and blank or
+overlong names. Test rows do not remain after each test; the schema, table and
+migration history do.
 
 `flyway-testcontainers` starts a disposable PostgreSQL 17 container, checks
 that Flyway records version `1`, and exercises an invalid migration in a
 separate schema to confirm startup fails with a Flyway cause. The container is
 removed after the test and the Compose database is not used. The main
-`src/main/resources/db/migration` location remains reserved for
-`V1__create_customer.sql` in CPS-DB-02.
+`src/main/resources/db/migration` location contains the business migration
+`V1__create_customer.sql`; the proof and invalid scripts remain under
+`src/test/resources`.
 
-During CPS-DB-01, the default `verify` returned `BUILD SUCCESS`; Compose
-reported PostgreSQL `healthy`; both integration profiles returned
-`BUILD SUCCESS`. The Compose-profile test changed only its named probe schema
-in the shared database; the Testcontainers profile used a disposable database.
+During CPS-DB-01, the default `verify` returned `BUILD SUCCESS` for compilation
+and packaging; Compose reported PostgreSQL `healthy`; both integration
+profiles returned `BUILD SUCCESS`. During CPS-DB-02, the learner reported
+`BUILD SUCCESS` for
+`mvn -pl customer-service -am -Pflyway-compose-postgres verify`. The profile
+uses the shared database's two dedicated test schemas; CPS-TEST-02 will
+revalidate the Customer constraints against disposable PostgreSQL.
 
 Docker CLI and Docker daemon checks are different: `docker --version` reports
 the client, while `docker info` must be able to contact the server/daemon.
