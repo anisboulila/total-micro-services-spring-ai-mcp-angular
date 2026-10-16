@@ -264,17 +264,18 @@
 
 ## 4. PostgreSQL, Flyway et modèle
 
-- [ ] 4.1 **CPS-DB-01** — Configurer Flyway
+- [x] 4.1 **CPS-DB-01** — Configurer Flyway
 
 - **Objectif / résultat :** Flyway exécute une migration de preuve sur PostgreSQL de test.
 - **Dépendances :** CPS-APP-01, CPS-PG-01.
 - **Concepts :** migration versionnée, datasource et fail-fast.
 - **Apprenant :** lance le test de migration et lit la sortie Flyway.
 - **Fichiers Copilot :** POM/configuration de `customer-service`, migration de preuve ou migration Customer si déjà prête.
-- **Commandes :** `mvn -pl customer-service -am verify`; `docker compose up -d postgres`; `docker compose logs --tail 50 customer-service`.
+- **Commandes :** `mvn -pl customer-service -am verify`; `docker compose up -d postgres`; `docker compose ps postgres`; `mvn -pl customer-service -am -Pflyway-compose-postgres verify`; `mvn -pl customer-service -am -Pflyway-testcontainers verify`.
 - **Vérification / acceptation :** Flyway est détecté; migration de preuve exécutée sur PostgreSQL local et version enregistrée; application échoue visiblement en cas de migration invalide.
 - **Erreurs / diagnostic :** datasource incorrecte ou mécanismes concurrents `schema.sql`; vérifier logs Flyway/datasource.
-- **Point d’arrêt :** attendre test Flyway réussi avant modèle métier.
+- **Point d’arrêt :** arrêter ici; ne pas commencer CPS-DB-02.
+- **Preuve observée :** `mvn -pl customer-service -am verify` a retourné `BUILD SUCCESS` pour la compilation et le packaging. `docker compose up -d postgres` a répondu `Running`; `docker compose ps postgres` indiquait `Up 45 hours (healthy)` et `127.0.0.1:5432->5432/tcp`. Le profil `flyway-compose-postgres` a retourné `BUILD SUCCESS` après avoir appliqué et vérifié la migration `V1` dans le schéma dédié `cps_flyway_probe` de la base partagée `customer_db`; cette vérification n'est pas une base isolée et le schéma/historique persistent. Le profil `flyway-testcontainers` a aussi retourné `BUILD SUCCESS` sur un PostgreSQL 17 jetable; le test valide l'historique et vérifie qu'une migration SQL invalide fait échouer le contexte avec une cause Flyway, sans toucher à la base Compose.
 
 - [ ] 4.2 **CPS-DB-02** — Créer la table Customer et ses contraintes
 

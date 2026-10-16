@@ -530,8 +530,108 @@ et `{"status":"UP"}`. L'application a ensuite été arrêtée avec `Ctrl+C`.
 
 **Piège ou erreur fréquente**
 Exposer tous les endpoints Actuator sans besoin ni contrôle d'accès, ou
-interpréter `UP` comme preuve que PostgreSQL ou les opérations métier sont
-disponibles. Ce squelette n'a pas de dépendance PostgreSQL.
+interpréter `UP` comme preuve que les opérations métier sont disponibles.
+Depuis CPS-DB-01, l'indicateur `db` vérifie également la connexion datasource,
+mais pas le bon fonctionnement des futures opérations métier.
+
+## À quoi servent Flyway et les migrations versionnées?
+
+**Réponse courte**
+Flyway applique les scripts SQL versionnés dans un ordre déterministe et
+enregistre leur état dans `flyway_schema_history`.
+
+**Explication détaillée**
+Une migration versionnée décrit une évolution SQL et n'est appliquée qu'une
+fois pour une version donnée. Flyway compare les migrations disponibles avec
+l'historique stocké dans la base et valide leurs checksums avant de migrer.
+L'application peut ainsi initialiser ou faire évoluer son schéma au démarrage
+sans dépendre d'une génération implicite du schéma par Hibernate ou
+`schema.sql`.
+
+**Exemple concret dans notre projet**
+La datasource et Flyway sont configurés dans `customer-service`; la migration
+de preuve `V1__flyway_proof.sql` se trouve uniquement dans les ressources de
+test et exécute `SELECT 1`. Cela préserve le `V1__create_customer.sql` métier
+prévu par CPS-DB-02. Les tests ont vérifié que la version `1` est enregistrée
+avec succès dans `flyway_schema_history`.
+
+**Piège ou erreur fréquente**
+Modifier une migration déjà appliquée, supposer qu'un fichier SQL présent a
+été exécuté, ou créer le même schéma en parallèle avec Hibernate et
+`schema.sql`.
+
+## Qu'est-ce qu'une datasource, et pourquoi son URL dépend-elle du contexte?
+
+**Réponse courte**
+La datasource fournit les connexions JDBC; son hôte dépend de l'endroit d'où
+tourne l'application.
+
+**Explication détaillée**
+Un programme lancé directement sur le poste rejoint le port PostgreSQL publié
+sur `localhost:5432`. Un conteneur ne doit pas utiliser son propre `localhost`
+pour joindre un autre service; il utilise le nom DNS Compose du service.
+Spring Boot construit la datasource avec le driver PostgreSQL et les valeurs
+`SPRING_DATASOURCE_*`.
+
+**Exemple concret dans notre projet**
+Le profil local utilise `localhost:5432` par défaut. Dans Compose,
+`customer-service` reçoit `jdbc:postgresql://postgres:5432/...` ainsi que les
+identifiants issus des variables PostgreSQL. Compose attend que PostgreSQL
+soit `healthy` avant de démarrer Customer, car Flyway doit accéder à la base
+pendant l'initialisation du contexte.
+
+**Piège ou erreur fréquente**
+Utiliser `localhost` depuis un conteneur, versionner un vrai mot de passe, ou
+confondre un conteneur PostgreSQL `running` avec une base prête à accepter des
+connexions.
+
+## Que prouve `flyway_schema_history` dans nos tests?
+
+**Réponse courte**
+Une ligne réussie dans `flyway_schema_history` prouve qu'une version donnée a
+été reconnue et appliquée par Flyway sur la base interrogée.
+
+**Explication détaillée**
+Le test vérifie aussi le produit de base avec `SELECT version()`, puis lit la
+version courante du bean Flyway et la ligne `version = '1'` avec `success =
+TRUE`. Cela distingue une vraie exécution SQL sur PostgreSQL d'une simple
+compilation des dépendances.
+
+**Exemple concret dans notre projet**
+Deux vérifications ont été exécutées. Le profil opt-in
+`flyway-compose-postgres` a écrit dans le schéma persistant
+`cps_flyway_probe` de la base partagée `customer_db`; il ne s'agit pas d'une
+base isolée. Le profil `flyway-testcontainers` a répété la preuve dans un
+PostgreSQL 17 jetable, sans modifier `customer_db`.
+
+**Piège ou erreur fréquente**
+Présenter un schéma de test dans une base partagée comme une base isolée, ou
+affirmer qu'un test est passé alors qu'il n'a fait que compiler les
+dépendances.
+
+## Comment Flyway fait-il échouer le démarrage si une migration est invalide?
+
+**Réponse courte**
+Flyway s'exécute pendant l'initialisation Spring; si la migration échoue,
+l'initialisation du contexte échoue aussi, faute de configuration qui masque
+l'erreur.
+
+**Explication détaillée**
+Le service active Flyway, valide les migrations au démarrage et échoue si le
+répertoire de migrations manque. Spring Boot exécute l'initialiseur Flyway
+avant de déclarer l'application prête; une exception de migration remonte et
+empêche le contexte de démarrer. Le healthcheck ne peut donc pas déclarer le
+service `healthy` après un échec de migration.
+
+**Exemple concret dans notre projet**
+Le test Testcontainers a chargé un SQL invalide dans le schéma jetable
+`cps_flyway_invalid` et vérifié que le contexte échouait avec une cause Flyway.
+La base locale partagée n'a pas été utilisée pour ce test négatif.
+
+**Piège ou erreur fréquente**
+Désactiver Flyway ou ignorer les migrations invalides pour faire démarrer
+l'application, ou tester volontairement un SQL cassé sur la base de
+développement partagée.
 
 ## Pourquoi publier PostgreSQL uniquement sur la boucle locale?
 

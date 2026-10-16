@@ -44,12 +44,15 @@ During CPS-MVN-01, `mvn -N validate` and `mvn validate` both returned
 `C:\SpringBOOT\outils\jdk-21`; the Maven version number was not included in
 that result.
 
-### Run the minimal Customer application
+### Run Customer locally
 
-From the repository root, run the module test and start Customer:
+Since CPS-DB-01, Customer runs Flyway during startup and requires PostgreSQL.
+Start the Compose database and check its health before starting Customer from
+the host:
 
 ```powershell
-mvn -pl customer-service -am test
+docker compose up -d postgres
+docker compose ps postgres
 mvn -pl customer-service spring-boot:run
 ```
 
@@ -60,12 +63,13 @@ Invoke-WebRequest http://localhost:8082/actuator/health
 ```
 
 The expected response is HTTP 200 with JSON `{"status":"UP"}`. Stop the
-application with `Ctrl+C` in the Maven terminal. This minimal application
-does not require PostgreSQL to start. If startup reports that port 8082 is
-already in use, inspect the listener with
+application with `Ctrl+C` in the Maven terminal. The local profile connects
+to `localhost:5432`; the Customer container uses the Compose DNS name
+`postgres:5432`. If startup reports that port 8082 is already in use, inspect the listener with
 `Get-NetTCPConnection -LocalPort 8082` before taking any action.
 
-During CPS-APP-01, the test command returned `BUILD SUCCESS`; startup reported
+Before the datasource was introduced in CPS-APP-01, the context test returned
+`BUILD SUCCESS`; startup reported
 `Started CustomerServiceApplication in 1.536 seconds`; the health request
 returned HTTP 200 and `{"status":"UP"}`, and the process stopped after
 `Ctrl+C`.
@@ -117,9 +121,11 @@ Compose's default network provides DNS names matching the service names.
 Customer listens on container port 8082 and is not published on the host;
 Gateway listens on container port 8080 and is published only on
 `127.0.0.1:8080`. The Compose healthchecks call each container's own Actuator
-health endpoint with Alpine's `wget`. No `depends_on` or PostgreSQL/Keycloak
-connection settings are needed yet because neither minimal application uses
-those services at startup.
+health endpoint with Alpine's `wget`. Since CPS-DB-01, Customer receives its
+JDBC URL and credentials from PostgreSQL Compose variables and waits for
+PostgreSQL's `healthy` state. Gateway still has no PostgreSQL or Keycloak
+startup dependency. The application containers have not been rebuilt or
+restarted under this new datasource configuration as part of CPS-DB-01.
 
 Wait for `healthy` in `docker compose ps`; `Up` alone means only that the
 container process is running. The current images are built from these Docker
@@ -132,6 +138,38 @@ the resolved configuration without error and that `docker compose up -d
 showed both applications `Up (healthy)`, Customer with only `8082/tcp`, and
 Gateway published as `127.0.0.1:8080->8080/tcp`; the logs showed `Started` for
 both applications.
+
+### Verify Flyway migrations
+
+The default Maven verification compiles and packages Customer. The two
+integration profiles below run the migration proof against PostgreSQL:
+
+```powershell
+mvn -pl customer-service -am verify
+docker compose up -d postgres
+docker compose ps postgres
+mvn -pl customer-service -am -Pflyway-compose-postgres verify
+mvn -pl customer-service -am -Pflyway-testcontainers verify
+```
+
+`flyway-compose-postgres` connects from the host to the Compose-published
+PostgreSQL endpoint and applies the test-only migration in schema
+`cps_flyway_probe` inside the shared `customer_db`. This is not an isolated
+database; the schema and `flyway_schema_history` remain after the test. The
+migration contains only `SELECT 1`, and the test does not create or modify
+business tables.
+
+`flyway-testcontainers` starts a disposable PostgreSQL 17 container, checks
+that Flyway records version `1`, and exercises an invalid migration in a
+separate schema to confirm startup fails with a Flyway cause. The container is
+removed after the test and the Compose database is not used. The main
+`src/main/resources/db/migration` location remains reserved for
+`V1__create_customer.sql` in CPS-DB-02.
+
+During CPS-DB-01, the default `verify` returned `BUILD SUCCESS`; Compose
+reported PostgreSQL `healthy`; both integration profiles returned
+`BUILD SUCCESS`. The Compose-profile test changed only its named probe schema
+in the shared database; the Testcontainers profile used a disposable database.
 
 Docker CLI and Docker daemon checks are different: `docker --version` reports
 the client, while `docker info` must be able to contact the server/daemon.

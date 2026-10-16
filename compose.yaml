@@ -34,6 +34,13 @@ services:
     build:
       context: .
       dockerfile: customer-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-customer_db}"
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-customer_app}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-customer-local-only}
     expose:
       - "8082"
     healthcheck:
