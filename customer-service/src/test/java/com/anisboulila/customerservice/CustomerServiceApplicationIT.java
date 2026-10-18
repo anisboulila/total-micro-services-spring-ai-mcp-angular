@@ -21,7 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(properties = {
         "spring.flyway.locations=classpath:db/flyway-proof",
         "spring.flyway.schemas=cps_flyway_probe",
-        "spring.flyway.default-schema=cps_flyway_probe"
+        "spring.flyway.default-schema=cps_flyway_probe",
+        "spring.jpa.hibernate.ddl-auto=none"
 })
 class CustomerServiceApplicationIT {
 
@@ -67,6 +68,7 @@ class CustomerServiceApplicationIT {
                         "spring.flyway.enabled=true",
                         "spring.flyway.validate-on-migrate=true",
                         "spring.flyway.create-schemas=true",
+                        "spring.jpa.hibernate.ddl-auto=none",
                         "spring.flyway.locations=classpath:db/flyway-invalid",
                         "spring.flyway.schemas=cps_flyway_invalid",
                         "spring.flyway.default-schema=cps_flyway_invalid")

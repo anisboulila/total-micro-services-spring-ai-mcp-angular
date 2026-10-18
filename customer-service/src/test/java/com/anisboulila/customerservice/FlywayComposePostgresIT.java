@@ -13,7 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(properties = {
         "spring.flyway.locations=classpath:db/flyway-proof",
         "spring.flyway.schemas=cps_flyway_probe",
-        "spring.flyway.default-schema=cps_flyway_probe"
+        "spring.flyway.default-schema=cps_flyway_probe",
+        "spring.jpa.hibernate.ddl-auto=none"
 })
 class FlywayComposePostgresIT {
 

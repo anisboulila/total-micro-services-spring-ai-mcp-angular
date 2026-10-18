@@ -20,7 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(properties = {
         "spring.flyway.locations=classpath:db/migration",
         "spring.flyway.schemas=cps_customer_schema",
-        "spring.flyway.default-schema=cps_customer_schema"
+        "spring.flyway.default-schema=cps_customer_schema",
+        "spring.jpa.properties.hibernate.default_schema=cps_customer_schema"
 })
 @Transactional
 class CustomerSchemaComposePostgresIT {

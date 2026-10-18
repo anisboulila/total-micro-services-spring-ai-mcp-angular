@@ -637,6 +637,92 @@ Confondre le nom de la base (`customer_db`) avec le schéma (`public` ou
 croire qu'une vérification applicative seule remplace une contrainte unique
 PostgreSQL.
 
+## Quelle est la différence entre une entité JPA et un DTO HTTP?
+
+**Réponse courte**
+L'entité JPA représente une ligne persistée; un DTO représente un contrat
+d'échange HTTP. Ils ne doivent pas être confondus.
+
+**Explication détaillée**
+L'entité porte le mapping objet-relationnel et les colonnes de la table. Un DTO
+est conçu selon les besoins et règles de l'API; il ne doit pas exposer les
+annotations, champs internes ou détails de persistance. Une couche de mapping
+séparera les deux lorsque les endpoints seront implémentés.
+
+**Exemple concret dans notre projet**
+`Customer` mappe `customer` (`id`, `sub`, `name`, `email`, `created_at`) par
+accès aux champs. Il n'existe encore ni contrôleur ni DTO HTTP dans CPS-DOM-01.
+
+**Piège ou erreur fréquente**
+Retourner directement une entité depuis un contrôleur et ainsi rendre le
+contrat HTTP dépendant du schéma de base.
+
+## Quel est le rôle du repository et du service applicatif?
+
+**Réponse courte**
+Le repository fournit l'accès persistant; le service applicatif porte le
+parcours d'écriture et les transformations métier prévues.
+
+**Explication détaillée**
+`CustomerRepository` étend `JpaRepository<Customer, UUID>` et délègue les
+opérations de persistance à Spring Data JPA. `CustomerApplicationService`
+normalise le nom et l'e-mail, fixe `created_at` avec une `Clock` UTC, puis
+demande au repository de sauvegarder l'entité. Il ne contient ni contrôleur,
+ni DTO HTTP, ni règles d'autorisation; l'appelant devra fournir l'identité
+issue d'un JWT validé.
+
+**Exemple concret dans notre projet**
+Le test utilise un repository Mockito et une `Clock.fixed(...)` pour vérifier
+la normalisation et l'horodatage sans base PostgreSQL ni contexte Spring.
+
+**Piège ou erreur fréquente**
+Placer les requêtes SQL dans un contrôleur, laisser le repository décider de
+la canonicalisation, ou confondre `save()` avec une validation de l'identité
+OIDC.
+
+## Pourquoi configurer Hibernate en `validate` plutôt qu'en `update`?
+
+**Réponse courte**
+Flyway possède le schéma; Hibernate vérifie le mapping sans créer ni modifier
+les tables.
+
+**Explication détaillée**
+`spring.jpa.hibernate.ddl-auto=validate` compare les métadonnées mappées aux
+tables existantes après l'application des migrations Flyway. Il ne crée pas
+de schéma. La création ou l'évolution demeure explicite et versionnée dans
+les migrations.
+
+**Exemple concret dans notre projet**
+`Customer` mappe le UUID, les colonnes `text`, `varchar(120)` et
+`TIMESTAMPTZ` de `V1__create_customer.sql`. Le profil d'intégration de schéma
+indique à Hibernate le schéma de test `cps_customer_schema`; la validation
+de l'interaction JPA/PostgreSQL reste à couvrir par les tests d'intégration.
+
+**Piège ou erreur fréquente**
+Utiliser `ddl-auto=update` en parallèle de Flyway; les changements implicites
+peuvent diverger des migrations versionnées.
+
+## Que prouvent les tests unitaires de CPS-DOM-01?
+
+**Réponse courte**
+Ils prouvent la normalisation et le comportement du service en isolation, pas
+que JPA écrit correctement dans PostgreSQL.
+
+**Explication détaillée**
+Le test mocke `CustomerRepository` et injecte une horloge fixe, sans charger
+Spring, Docker ou une base. Le mapping réel, le générateur Hibernate de UUID
+qui interroge `gen_random_uuid()` sur PostgreSQL et la persistance seront
+validés à la frontière d'intégration prévue plus tard.
+
+**Exemple concret dans notre projet**
+La commande ciblée a rapporté trois tests exécutés, zéro échec, erreur ou
+ignoré. L'entité n'a pas d'UUID avant l'insertion; le générateur Hibernate
+personnalisé demande à PostgreSQL de le produire lors de la persistance.
+
+**Piège ou erreur fréquente**
+Présenter un test avec repository mocké comme preuve de persistance, ou
+confondre l'UUID généré par Hibernate en Java avec celui demandé à PostgreSQL.
+
 ## Comment Flyway fait-il échouer le démarrage si une migration est invalide?
 
 **Réponse courte**

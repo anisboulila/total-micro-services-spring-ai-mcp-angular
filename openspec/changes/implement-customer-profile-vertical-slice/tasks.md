@@ -290,17 +290,18 @@
 - **Preuve observée :** l’apprenant a exécuté la commande avec le profil `flyway-compose-postgres` et rapporté `BUILD SUCCESS`. Le profil Failsafe exécute les tests PostgreSQL Compose de preuve Flyway et de schéma Customer. `CustomerSchemaComposePostgresIT` vérifie l’application de V1, les cinq colonnes, l’index unique `lower(btrim(email))`, une insertion valide et la génération de l’UUID, le rejet d’un `sub` dupliqué, d’un e-mail dupliqué malgré la casse/les espaces, et de noms vides ou trop longs. Le test utilise le schéma persistant `cps_customer_schema` dans la base partagée `customer_db`; il ne réinitialise ni ne supprime la base. Les insertions de test sont annulées par transaction; la table et `flyway_schema_history` restent présentes. Les contraintes seront revalidées avec Testcontainers en CPS-TEST-02.
 - **Point d’arrêt :** attendre avant de commencer CPS-DOM-01.
 
-- [ ] 4.3 **CPS-DOM-01** — Ajouter le modèle et le repository Customer
+- [x] 4.3 **CPS-DOM-01** — Ajouter le modèle et le repository Customer
 
 - **Objectif / résultat :** accès persistant Customer derrière modèle/repository, sans exposer l’entité.
 - **Dépendances :** CPS-DB-02.
 - **Concepts :** entité vs DTO, repository, couche applicative.
 - **Apprenant :** lit mapping et lance tests unitaires ciblés.
-- **Fichiers Copilot :** entité, repository, service minimal et tests unitaires.
+- **Fichiers Copilot :** entité JPA, générateur PostgreSQL de UUID, repository, service applicatif minimal et tests unitaires.
 - **Commandes :** `mvn -pl customer-service "-Dtest=*Customer*Test" test`.
 - **Vérification / acceptation :** mapping déterministe et entité non utilisée comme contrat HTTP.
 - **Erreurs / diagnostic :** test unitaire qui exige DB est mal isolé; déplacer le cas au test d’intégration.
-- **Point d’arrêt :** attendre test ciblé avant API.
+- **Preuve observée :** l’apprenant a rapporté `BUILD SUCCESS` et `Tests run: 3, Failures: 0, Errors: 0, Skipped: 0`. `CustomerApplicationServiceTest` utilise un repository Mockito et une `Clock` fixe; ces tests couvrent la normalisation du nom et de l’e-mail, l’horodatage service, le rejet d’un nom invalide avant persistance et l’absence d’UUID avant insertion. Ils n’exécutent pas JPA contre PostgreSQL; cette interaction restera à vérifier dans CPS-TEST-02.
+- **Point d’arrêt :** ne pas commencer la tâche suivante.
 
 ## 5. Contrats REST et sécurité
 

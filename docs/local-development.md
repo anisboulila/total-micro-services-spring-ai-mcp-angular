@@ -99,6 +99,21 @@ During CPS-APP-02, the test command returned `BUILD SUCCESS`; startup reported
 `Started ApiGatewayApplication in 1.904 seconds`; the health request returned
 HTTP 200 and `{"status":"UP"}`, and the process stopped after `Ctrl+C`.
 
+### Run Customer model and service unit tests
+
+From the repository root, run the focused tests without starting PostgreSQL or
+a Spring application context:
+
+```powershell
+mvn -pl customer-service "-Dtest=*Customer*Test" test
+```
+
+`CustomerApplicationServiceTest` mocks `CustomerRepository` and uses a fixed
+`Clock` to verify name/email normalization and the service timestamp. The
+learner reported `BUILD SUCCESS` with three tests run and no failures, errors,
+or skips. This proves unit behavior only; it does not exercise JPA persistence
+or the PostgreSQL UUID generator.
+
 ### Build and run the applications with Docker Compose
 
 From the repository root, validate the Compose file, build both images and
