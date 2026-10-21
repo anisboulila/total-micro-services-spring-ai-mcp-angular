@@ -41,6 +41,9 @@ services:
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-customer_db}"
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-customer_app}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-customer-local-only}
+      CUSTOMER_SECURITY_ISSUER_URI: "http://localhost:8081/realms/customer-dev"
+      CUSTOMER_SECURITY_JWK_SET_URI: "http://keycloak:8080/realms/customer-dev/protocol/openid-connect/certs"
+      CUSTOMER_SECURITY_AUDIENCE: "customer-service"
     expose:
       - "8082"
     healthcheck:

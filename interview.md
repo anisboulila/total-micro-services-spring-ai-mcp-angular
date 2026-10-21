@@ -723,6 +723,93 @@ personnalisé demande à PostgreSQL de le produire lors de la persistance.
 Présenter un test avec repository mocké comme preuve de persistance, ou
 confondre l'UUID généré par Hibernate en Java avec celui demandé à PostgreSQL.
 
+## À quoi sert RFC 9457 pour les erreurs HTTP?
+
+**Réponse courte**
+RFC 9457 fournit une structure commune `application/problem+json` pour décrire
+une erreur HTTP sans exposer d'informations internes.
+
+**Explication détaillée**
+Le document Problem Details contient notamment `type`, `title`, `status`,
+`detail` et, si pertinent, `instance`. Le contrat Customer ajoute le code
+stable `code`, l'identifiant `correlationId` et, pour les erreurs de champs,
+`errors`. Les détails sont sûrs; SQL, trace de pile, jeton, secret et contenu
+de requête ne sont jamais retournés.
+
+**Exemple concret dans notre projet**
+`RestProblemExceptionHandler` construit un `ProblemDetail` avec
+`type=about:blank`, le statut réel et les extensions prévues. Le test MockMvc
+compare strictement le JSON d'une erreur 400, puis vérifie un 500 générique
+avec `INTERNAL_ERROR`.
+
+**Piège ou erreur fréquente**
+Renvoyer `exception.getMessage()` sans contrôle, ou créer une forme JSON
+différente pour chaque contrôleur.
+
+## Quel est le rôle de `@RestControllerAdvice` et de l'exception mapping?
+
+**Réponse courte**
+`@RestControllerAdvice` centralise la conversion des exceptions REST en
+réponses HTTP structurées.
+
+**Explication détaillée**
+Le handler convertit une `ApiProblemException` connue en statut, code et détail
+sûr. Les erreurs de validation sont ramenées à `VALIDATION_FAILED`, avec les
+noms de champs et codes de validation, sans valeur rejetée. Une exception
+inattendue devient un 500 générique; sa trace est réduite à ses types et
+frames pour les logs corrélés, sans son message potentiellement sensible.
+
+**Exemple concret dans notre projet**
+Le contrôleur `ProblemProbeController` existe uniquement dans les tests
+MockMvc. Il déclenche une erreur prévue ou une exception interne; aucun
+endpoint de production n'a été ajouté pour tester le handler.
+
+**Piège ou erreur fréquente**
+Mettre des règles métier dans le handler global ou transformer toutes les
+exceptions en la même erreur client.
+
+## Pourquoi garder un code d'erreur stable?
+
+**Réponse courte**
+Le client et les tests s'appuient sur `code`, pas sur le texte humain de
+`detail`.
+
+**Explication détaillée**
+Les codes en `UPPER_SNAKE_CASE` restent stables quand un message est reformulé.
+Le handler central ne choisit pas les codes métier futurs; les exceptions
+applicatives connues fournissent leur code. L'erreur interne générique utilise
+`INTERNAL_ERROR`, tandis qu'une erreur de validation utilise
+`VALIDATION_FAILED`.
+
+**Exemple concret dans notre projet**
+Le test compare `VALIDATION_FAILED` dans la réponse Problem Details exacte et
+vérifie `INTERNAL_ERROR` pour une exception imprévue.
+
+**Piège ou erreur fréquente**
+Utiliser le message d'exception comme code ou modifier un code public sans
+considérer ses consommateurs.
+
+## Comment un correlation ID aide-t-il sans devenir une identité de sécurité?
+
+**Réponse courte**
+Il relie l'erreur HTTP à ses logs, mais ne prouve ni l'identité ni les droits
+de l'appelant.
+
+**Explication détaillée**
+Le filtre accepte `X-Correlation-ID` uniquement sous forme UUID canonique.
+Une valeur absente, multiple ou invalide est remplacée par un UUID serveur.
+Le même identifiant est placé dans le MDC, le corps Problem Details et
+l'en-tête de réponse. Les logs d'erreur incluent cet ID; les messages bruts
+d'exception, qui pourraient contenir un secret, sont exclus.
+
+**Exemple concret dans notre projet**
+MockMvc vérifie qu'un UUID valide est conservé, qu'une valeur invalide est
+remplacée et que l'en-tête de réponse ne contient qu'une seule valeur.
+
+**Piège ou erreur fréquente**
+Réfléchir un en-tête arbitraire, traiter l'ID comme un jeton de confiance, ou
+laisser un identifiant différent dans les logs et dans la réponse.
+
 ## Comment Flyway fait-il échouer le démarrage si une migration est invalide?
 
 **Réponse courte**
@@ -807,16 +894,17 @@ Le formulaire public ne doit proposer aucun choix de rôle privilégié. La
 séparation doit être vérifiée dans les affectations effectives : un compte
 inscrit reçoit `CUSTOMER`, tandis qu'un compte opérateur distinct reçoit
 `OPERATOR` par une action administrative. La présence du rôle dans la console
-ne prouve pas qu'il est inclus dans un ID token; cela dépend notamment des
-mappings et scopes du client.
+ne prouve pas qu'il est inclus dans un access token; cela dépend notamment
+des mappings et scopes du client.
 
 **Exemple concret dans notre projet**
 La console a confirmé les rôles realm `CUSTOMER` et `OPERATOR`, `CUSTOMER`
 seul dans les rôles par défaut, et l'inscription activée dans `customer-dev`
 mais désactivée dans `master`. Un compte de test avait `CUSTOMER` sans
 `OPERATOR`; un compte distinct a reçu `OPERATOR` comme affectation directe.
-Le test PKCE n'a toutefois affiché aucun de ces rôles dans l'ID token; le
-mapper correspondant reste à examiner.
+Lors du test direct, le résumé local de l'access token a montré `CUSTOMER`.
+L'ID token et l'access token sont des jetons distincts : c'est l'access token
+qui est envoyé à `customer-service`.
 
 **Piège ou erreur fréquente**
 Croire qu'un rôle n'est pas accordé parce qu'il est absent d'un ID token, sans
@@ -841,13 +929,88 @@ cryptographique du JWT.
 **Exemple concret dans notre projet**
 Le script `scripts/dev/oidc-pkce-login.ps1` cible Windows PowerShell 5.1,
 ouvre le navigateur et écoute uniquement sur `127.0.0.1:8765` à
-`/callback`. La commande a terminé l'échange OIDC et affiché l'issuer attendu.
-`email_verified` valait `False` et aucun rôle n'était présent dans l'ID token.
-Le script n'a pas validé la signature; cette tâche revient au Resource Server
-Spring Security ultérieur.
+`/callback`. Le script termine l'échange OIDC et ne montre jamais les valeurs
+des jetons. Son résumé des claims d'access token est seulement décodé, pas
+vérifié; c'est le Resource Server qui vérifie cryptographiquement le jeton reçu.
 
 **Piège ou erreur fréquente**
 Dire que le navigateur « utilise un client secret PKCE », ou qu'un ID token
 est fiable parce que son payload a été décodé et que `iss` correspond. Sans
 validation de signature et des contraintes du jeton, les claims ne sont pas
 cryptographiquement authentifiés.
+
+## Comment `customer-service` valide-t-il un JWT indépendamment de la Gateway?
+
+**Réponse courte**
+Le Resource Server Spring Security vérifie lui-même la signature et les claims
+du bearer token avant d'exposer un principal authentifié à l'application.
+
+**Explication détaillée**
+Nimbus récupère les clés publiques depuis le JWKS de l'issuer configuré et
+vérifie la signature. Les validateurs vérifient aussi l'issuer exact,
+l'expiration et les contraintes temporelles standard; un validateur propre au
+service exige l'audience `customer-service`. La Gateway ne constitue donc pas
+une frontière de confiance suffisante : chaque microservice valide le token
+qu'il reçoit.
+
+**Exemple concret dans notre projet**
+En local, l'issuer attendu est
+`http://localhost:8081/realms/customer-dev`; dans Compose, le conteneur récupère
+le JWKS par `http://keycloak:8080/...` tout en vérifiant la valeur `iss`
+émise pour le navigateur. Le mapper d'audience Keycloak doit ajouter
+`customer-service` aux access tokens. Le test local réel a confirmé l'issuer
+et l'audience, puis donné 401 sans jeton, 200 avec le jeton Keycloak et 401
+après altération de la signature. Les tests automatisés couvrent en complément
+les autres cas négatifs de façon déterministe.
+
+**Piège ou erreur fréquente**
+Tester uniquement avec le helper Spring `jwt()` : il injecte un JWT déjà
+authentifié et ne prouve pas que la signature reçue est vérifiée.
+
+## D'où viennent `sub` et les autorités Spring Security?
+
+**Réponse courte**
+`sub` vient du principal JWT vérifié; les autorités viennent de
+`realm_access.roles`.
+
+**Explication détaillée**
+Après validation, `JwtAuthenticationToken#getName()` expose le sujet JWT.
+Le convertisseur du projet lit uniquement les chaînes du claim Keycloak
+`realm_access.roles` et les mappe en autorités sans ajouter de préfixe. Les
+headers `X-User-Id` ou `X-Roles` sont contrôlés par l'appelant et ne sont
+jamais consultés pour établir l'identité ou les rôles.
+
+**Exemple concret dans notre projet**
+Le test automatisé signe un JWT synthétique dont `sub` vaut
+`verified-user-123`. Le test local Keycloak a aussi renvoyé le `sub` du
+principal vérifié et l'autorité `CUSTOMER`; sa valeur n'est pas conservée dans
+la documentation. Un appel avec des headers falsifiés conserve l'identité et
+les rôles issus du JWT.
+
+**Piège ou erreur fréquente**
+Confondre l'authentification (token valide) avec l'autorisation (droit
+d'effectuer une action). Un rôle présent ne doit pas créer une permission
+métier qui n'a pas été explicitement configurée.
+
+## Quelle différence entre HTTP 401 et HTTP 403?
+
+**Réponse courte**
+401 signifie que l'appelant n'est pas authentifié; 403 signifie qu'il est
+authentifié mais interdit pour la ressource demandée.
+
+**Explication détaillée**
+Un bearer token absent ou invalide est rejeté avec HTTP 401. Spring Security
+renvoie HTTP 403 lorsqu'une règle d'autorisation configurée refuse un principal
+authentifié. La réponse suit le format Problem Details du projet et ne révèle
+pas la cause cryptographique détaillée du rejet.
+
+**Exemple concret dans notre projet**
+Les tests automatisés couvrent 401 pour token absent, expiré, signé par une
+autre clé, mauvais issuer, audience incorrecte ou absente. Le test réel a
+confirmé 401 sans jeton et avec signature altérée, puis 200 avec l'access
+token Keycloak. CPS-SEC-01 ne définit pas encore d'autorisation métier par
+rôle; le gestionnaire 403 est préparé pour les règles des tâches ultérieures.
+
+**Piège ou erreur fréquente**
+Renvoyer 403 pour un token invalide ou 401 pour un utilisateur authentifié
+mais non autorisé.

@@ -114,6 +114,23 @@ learner reported `BUILD SUCCESS` with three tests run and no failures, errors,
 or skips. This proves unit behavior only; it does not exercise JPA persistence
 or the PostgreSQL UUID generator.
 
+### Test Customer RFC 9457 error responses
+
+From the repository root, run the Customer unit and MVC-slice tests:
+
+```powershell
+mvn -pl customer-service -am test
+```
+
+`RestProblemExceptionHandlerTest` uses `@WebMvcTest` and a test-only
+`ProblemProbeController`; no production endpoint, PostgreSQL, or Docker is
+needed. It checks the strict `application/problem+json` shape, safe 400 and
+500 details, optional field errors, and correlation-ID handling. A valid
+`X-Correlation-ID` UUID is reused; an invalid value is replaced. The same
+identifier appears in the response body and response header. During CPS-API-01,
+the command returned `BUILD SUCCESS`: five tests ran with no failures, errors,
+or skips.
+
 ### Build and run the applications with Docker Compose
 
 From the repository root, validate the Compose file, build both images and
@@ -355,17 +372,20 @@ checked before the authorization code is used. The code is exchanged in memory
 with the original verifier, and the ID token payload is checked for the
 expected issuer, audience, authorized party when applicable, and nonce.
 
-The script does **not** validate the ID token signature or its full lifetime
-and claim constraints. The displayed ID-token claims are decoded for this
-local learning exercise and are not cryptographically trusted. Signature,
-issuer, audience, expiry, and authorization enforcement must be validated by
-the Spring Security Resource Server in a later task.
+The script does **not** validate either token's signature or full lifetime and
+claim constraints. Any displayed token claims are decoded locally for this
+learning exercise and are not cryptographically trusted. Signature, issuer,
+audience, expiry, and authorization enforcement are the Spring Security
+Resource Server's responsibility.
 
-Only `iss`, `sub`, `email_verified`, and the `CUSTOMER`/`OPERATOR` realm roles
-are displayed. The script does not display, save, or log access tokens, ID
-tokens, refresh tokens, the authorization code, the verifier, or credentials.
-The callback listener is closed after the response and in cleanup paths. Do
-not enable PowerShell transcription during the test, and never share a token,
+The default output displays a limited set of ID-token claims. With
+`-ShowAccessTokenClaims` or `-ProbeCustomerService`, it also displays a
+sanitized summary of selected access-token claims, never the token itself.
+With `-ProbeCustomerService`, the token is sent in memory to a test-only
+Customer route. The script does not save or log access tokens, ID tokens,
+refresh tokens, the authorization code, the verifier, or credentials. The
+callback listener is closed after the response and in cleanup paths. Do not
+enable PowerShell transcription during the test, and never share a token,
 authorization code, or password.
 
 ### Troubleshooting
@@ -381,18 +401,83 @@ authorization code, or password.
 | State or nonce mismatch | The script rejects the response and closes the listener. Restart the flow; do not bypass either check. |
 | A role is absent from the output | Check the realm role, the user's effective role mappings/default roles, and the `roles` client scope/protocol mapper. Do not share a JWT. |
 
-Manual runtime verification on 2026-10-15 completed successfully under Windows
-PowerShell 5.1: Keycloak returned to the local callback and the script completed
-the authorization-code exchange. The reported issuer matched the expected
-realm. The test account's `email_verified` value was `False`, and the script
-reported no `CUSTOMER` or `OPERATOR` role in the ID token. No token or
-authorization code was retained in this documentation. This confirms the
-interactive OIDC/PKCE flow but does not confirm role inclusion in the ID token
-or validate the ID token signature.
+The initial interactive PKCE check confirmed the callback and authorization
+code exchange, but its ID-token output alone did not establish the access
+token's roles or cryptographic validity. A later direct Resource Server probe
+below separately verified the real access token. No token or authorization
+code is retained in this documentation.
 
-If a realm role is expected but absent from the script output, first verify the
-role exists in `customer-dev` and is present in the user's effective role
-mapping. Then inspect the `customer-local` client scopes and the realm-role
-protocol mapper, including whether it is configured to add realm roles to the
-ID token (the script reads the ID token, not the access token). Do not copy or
-share tokens while diagnosing this.
+If a realm role is expected but absent from the access-token summary, first
+verify the role exists in `customer-dev` and is present in the user's effective
+role mapping. Then inspect the `customer-local` client scopes and realm-role
+protocol mapper for the access token. Do not copy or share tokens while
+diagnosing this.
+
+## Customer Resource Server JWT validation
+
+`customer-service` validates bearer access tokens itself; access through the
+Gateway does not replace this check. Its local issuer is
+`http://localhost:8081/realms/customer-dev`, its expected audience is
+`customer-service`, and it reads signing keys from the realm JWKS endpoint.
+The Compose environment uses `http://keycloak:8080/realms/customer-dev/...`
+for JWKS network access, while retaining the issuer value contained in tokens.
+
+The development realm export at `infra/keycloak/realm-dev.json` configures a
+Keycloak audience protocol mapper that adds the custom audience
+`customer-service` to access tokens, not ID tokens. A persistent local realm
+is not automatically updated by editing or re-importing that export. For an
+existing realm, configure the `customer-local` client's audience mapper with
+custom audience `customer-service` and enable **Add to access token**; do not
+put the audience only in the ID token. The access token itself must never be
+copied into documentation or logs.
+
+Run the Customer tests from the repository root:
+
+```powershell
+mvn -pl customer-service -am test
+```
+
+`CustomerSecurityConfigurationTest` signs synthetic JWTs with a test-only RSA
+key and serves the matching public key through a local JWKS endpoint. The test
+exercises the actual Resource Server decoder, signature and claim validators,
+role mapping, and 401 behavior without needing Keycloak, PostgreSQL, or the
+Gateway. It does not prove that a running Keycloak realm has the required
+audience mapper; that realm configuration must be checked separately.
+
+### Direct local Keycloak-to-Customer probe
+
+For a real local check, first start Customer from the repository root with the
+opt-in profile:
+
+```powershell
+mvn -pl customer-service -Plocal-security-probe test-compile spring-boot:run
+```
+
+This profile explicitly adds `target/test-classes` to the local run classpath,
+so `/test/security/principal` from `src/test` is available only for this
+manual probe. It does not add the controller to the production artifact or
+disable Spring Security. The local profile also points Flyway and Hibernate
+at the existing `cps_customer_schema`; this avoids starting against the
+unmanaged, non-empty `public` schema. That schema setting is for local startup,
+not the fix for a missing-route 500.
+
+In a second PowerShell window, run the PKCE login and direct probes:
+
+```powershell
+.\scripts\dev\oidc-pkce-login.ps1 -Issuer "http://localhost:8081/realms/customer-dev" -ClientId "customer-local" -ProbeCustomerService
+```
+
+The helper checks the discovery issuer, obtains the access token through the
+browser-based Authorization Code + PKCE flow, then calls Customer without a
+token, with the access token, and with one signature character altered. The
+reported local result was HTTP 401, HTTP 200, and HTTP 401 respectively; the
+200 response exposed the verified principal's `sub` and `CUSTOMER` authority.
+The issuer and access-token audience summary matched the configured values,
+including `customer-service`. The token and subject value are intentionally
+not recorded here.
+
+The initial HTTP 500 was not a JWT-validation failure: the earlier Customer
+run did not have the test-only probe controller on its classpath, so Spring
+MVC could not resolve that path after authentication and raised
+`NoResourceFoundException`. The explicit Maven profile made the test route
+available; no production security rule or JWT validator was weakened.

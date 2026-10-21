@@ -9,7 +9,11 @@ param(
     [string]$ClientId,
 
     [ValidateRange(15, 600)]
-    [int]$TimeoutSeconds = 180
+    [int]$TimeoutSeconds = 180,
+
+    [switch]$ShowAccessTokenClaims,
+
+    [switch]$ProbeCustomerService
 )
 
 Set-StrictMode -Version 2.0
@@ -27,9 +31,13 @@ $state = $null
 $nonce = $null
 $authorizationCode = $null
 $tokenResponse = $null
+$accessToken = $null
+$accessClaims = $null
+$tamperedAccessToken = $null
 $idToken = $null
 $idClaims = $null
 $exitCode = 0
+$customerServiceProbeUri = 'http://localhost:8082/test/security/principal'
 
 function Stop-WithSafeError {
     param(
@@ -145,7 +153,7 @@ function ConvertFrom-UnverifiedJwtPayload {
 
     $parts = $Jwt.Split('.')
     if ($parts.Length -ne 3 -or [string]::IsNullOrEmpty($parts[1])) {
-        Stop-WithSafeError 'Keycloak did not return an ID token in the expected format.'
+        Stop-WithSafeError 'Keycloak did not return a JWT in the expected format.'
     }
 
     $payload = $parts[1].Replace('-', '+').Replace('_', '/')
@@ -153,7 +161,7 @@ function ConvertFrom-UnverifiedJwtPayload {
         0 { }
         2 { $payload += '==' }
         3 { $payload += '=' }
-        default { Stop-WithSafeError 'The ID token payload could not be decoded.' }
+        default { Stop-WithSafeError 'The JWT payload could not be decoded.' }
     }
 
     $payloadBytes = $null
@@ -163,13 +171,171 @@ function ConvertFrom-UnverifiedJwtPayload {
         return (ConvertFrom-Json -InputObject $payloadJson -ErrorAction Stop)
     }
     catch {
-        Stop-WithSafeError 'The ID token payload could not be decoded.'
+        Stop-WithSafeError 'The JWT payload could not be decoded.'
     }
     finally {
         if ($null -ne $payloadBytes) {
             [System.Array]::Clear($payloadBytes, 0, $payloadBytes.Length)
         }
     }
+}
+
+function Get-SafeClaimText {
+    param(
+        [AllowNull()]
+        [object]$Value,
+
+        [Parameter(Mandatory = $true)]
+        [int]$MaximumLength
+    )
+
+    if ($Value -isnot [string] -or
+        $Value.Length -eq 0 -or
+        $Value.Length -gt $MaximumLength -or
+        $Value -match '[\x00-\x1F\x7F]') {
+        return '(absent or invalid)'
+    }
+
+    return $Value
+}
+
+function Write-AccessTokenClaimSummary {
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$Claims
+    )
+
+    $issuerValue = $null
+    $issuerProperty = $Claims.PSObject.Properties['iss']
+    if ($null -ne $issuerProperty) {
+        $issuerValue = $issuerProperty.Value
+    }
+    $issuer = Get-SafeClaimText -Value $issuerValue -MaximumLength 512
+
+    $subjectValue = $null
+    $subjectProperty = $Claims.PSObject.Properties['sub']
+    if ($null -ne $subjectProperty) {
+        $subjectValue = $subjectProperty.Value
+    }
+    $subject = Get-SafeClaimText -Value $subjectValue -MaximumLength 255
+    $audiences = @()
+    $audienceProperty = $Claims.PSObject.Properties['aud']
+    if ($null -ne $audienceProperty) {
+        foreach ($audience in @($audienceProperty.Value)) {
+            $safeAudience = Get-SafeClaimText -Value $audience -MaximumLength 256
+            if ($safeAudience -cne '(absent or invalid)') {
+                $audiences += $safeAudience
+            }
+        }
+    }
+
+    $expiration = 'absent or invalid'
+    $expirationProperty = $Claims.PSObject.Properties['exp']
+    if ($null -ne $expirationProperty) {
+        try {
+            $expiration = [DateTimeOffset]::FromUnixTimeSeconds(
+                [long]$expirationProperty.Value
+            ).UtcDateTime.ToString('o')
+        }
+        catch {
+            $expiration = 'absent or invalid'
+        }
+    }
+
+    $roles = @()
+    $realmAccessProperty = $Claims.PSObject.Properties['realm_access']
+    if ($null -ne $realmAccessProperty -and $null -ne $realmAccessProperty.Value) {
+        $rolesProperty = $realmAccessProperty.Value.PSObject.Properties['roles']
+        if ($null -ne $rolesProperty -and $null -ne $rolesProperty.Value) {
+            foreach ($role in @($rolesProperty.Value)) {
+                if ($role -ceq 'CUSTOMER' -or $role -ceq 'OPERATOR') {
+                    $roles += [string]$role
+                }
+            }
+        }
+    }
+
+    Write-Host 'Access-token claims below are decoded locally; this script does not verify their signature.'
+    Write-Host ("access-token iss: {0}" -f $issuer)
+    Write-Host ("access-token sub: {0}" -f $subject)
+    Write-Host ("access-token aud: {0}" -f $(if ($audiences.Count -gt 0) {
+                $audiences -join ', '
+            } else {
+                '(absent)'
+            }))
+    Write-Host ("access-token exp (UTC): {0}" -f $expiration)
+    Write-Host ("access-token realm roles: {0}" -f $(if ($roles.Count -gt 0) {
+                $roles -join ', '
+            } else {
+                '(CUSTOMER/OPERATOR absent)'
+            }))
+}
+
+function Invoke-CustomerServiceSecurityProbe {
+    param(
+        [AllowNull()]
+        [string]$BearerToken
+    )
+
+    $request = [System.Net.HttpWebRequest]::Create($customerServiceProbeUri)
+    $request.Method = 'GET'
+    $request.Timeout = 15000
+    $request.ReadWriteTimeout = 15000
+    $request.AllowAutoRedirect = $false
+    $request.Proxy = $null
+    if (-not [string]::IsNullOrEmpty($BearerToken)) {
+        $request.Headers[[System.Net.HttpRequestHeader]::Authorization] = "Bearer $BearerToken"
+    }
+
+    $response = $null
+    $body = ''
+    try {
+        $response = [System.Net.HttpWebResponse]$request.GetResponse()
+    }
+    catch [System.Net.WebException] {
+        if ($null -eq $_.Exception.Response) {
+            Stop-WithSafeError 'Could not reach customer-service at http://localhost:8082.'
+        }
+        $response = [System.Net.HttpWebResponse]$_.Exception.Response
+    }
+
+    try {
+        if ([int]$response.StatusCode -eq 200) {
+            $reader = [System.IO.StreamReader]::new($response.GetResponseStream())
+            try {
+                $body = $reader.ReadToEnd()
+            }
+            finally {
+                $reader.Dispose()
+            }
+        }
+        return [pscustomobject]@{
+            StatusCode = [int]$response.StatusCode
+            Body       = $body
+        }
+    }
+    finally {
+        $response.Close()
+    }
+}
+
+function New-TamperedJwtSignature {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Jwt
+    )
+
+    $parts = $Jwt.Split('.')
+    if ($parts.Length -ne 3 -or [string]::IsNullOrEmpty($parts[2])) {
+        Stop-WithSafeError 'The access token cannot be used for the signature-tampering check.'
+    }
+
+    # Modifier un caractère au milieu de la signature change effectivement les octets signés.
+    $signature = [string]$parts[2]
+    $index = [int][Math]::Floor($signature.Length / 2)
+    $replacement = if ($signature[$index] -ceq 'A') { 'B' } else { 'A' }
+    $parts[2] = $signature.Substring(0, $index) + $replacement + $signature.Substring($index + 1)
+    return ($parts -join '.')
 }
 
 try {
@@ -436,6 +602,10 @@ try {
     if ([string]::IsNullOrEmpty($idToken)) {
         Stop-WithSafeError 'Keycloak did not return an ID token. No token value was displayed.'
     }
+    $accessToken = [string]$tokenResponse.access_token
+    if ([string]::IsNullOrEmpty($accessToken)) {
+        Stop-WithSafeError 'Keycloak did not return an access token. No token value was displayed.'
+    }
 
     $idClaims = ConvertFrom-UnverifiedJwtPayload -Jwt $idToken
     if ([string]$idClaims.iss -cne $expectedIssuer) {
@@ -489,6 +659,44 @@ try {
     else {
         Write-Host 'realm roles: (none of CUSTOMER or OPERATOR was present)'
     }
+
+    if ($ShowAccessTokenClaims -or $ProbeCustomerService) {
+        $accessClaims = ConvertFrom-UnverifiedJwtPayload -Jwt $accessToken
+        Write-AccessTokenClaimSummary -Claims $accessClaims
+    }
+
+    if ($ProbeCustomerService) {
+        # La route n'existe que dans src/test; les statuts et claims prouvent le passage du vrai filtre JWT.
+        $withoutTokenResponse = Invoke-CustomerServiceSecurityProbe -BearerToken $null
+        $validTokenResponse = Invoke-CustomerServiceSecurityProbe -BearerToken $accessToken
+        $tamperedAccessToken = New-TamperedJwtSignature -Jwt $accessToken
+        $tamperedTokenResponse = Invoke-CustomerServiceSecurityProbe -BearerToken $tamperedAccessToken
+
+        Write-Host ("Customer Service probe without token: HTTP {0} (expected 401)" -f $withoutTokenResponse.StatusCode)
+        Write-Host ("Customer Service probe with Keycloak token: HTTP {0} (expected 200)" -f $validTokenResponse.StatusCode)
+        Write-Host ("Customer Service probe with altered signature: HTTP {0} (expected 401)" -f $tamperedTokenResponse.StatusCode)
+        if ($validTokenResponse.StatusCode -eq 200) {
+            try {
+                $principalResponse = ConvertFrom-Json -InputObject $validTokenResponse.Body -ErrorAction Stop
+                $verifiedSubject = Get-SafeClaimText -Value $principalResponse.sub -MaximumLength 255
+                $verifiedRoles = @()
+                foreach ($role in @($principalResponse.authorities)) {
+                    if ($role -ceq 'CUSTOMER' -or $role -ceq 'OPERATOR') {
+                        $verifiedRoles += [string]$role
+                    }
+                }
+                Write-Host ("Verified principal sub: {0}" -f $verifiedSubject)
+                Write-Host ("Verified principal roles: {0}" -f $(if ($verifiedRoles.Count -gt 0) {
+                            $verifiedRoles -join ', '
+                        } else {
+                            '(CUSTOMER/OPERATOR absent)'
+                        }))
+            }
+            catch {
+                Stop-WithSafeError 'The test-only principal response was not in the expected safe JSON format.'
+            }
+        }
+    }
 }
 catch {
     $safeMessage = 'OIDC flow failed. No token, authorization code, or verifier was displayed.'
@@ -528,6 +736,9 @@ finally {
     $responseIssuer = $null
     $Matches = @{}
     $tokenResponse = $null
+    $accessToken = $null
+    $accessClaims = $null
+    $tamperedAccessToken = $null
     $idToken = $null
     $idClaims = $null
 }

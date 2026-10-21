@@ -76,6 +76,14 @@ dans la réponse. Les codes sont en majuscules `UPPER_SNAKE_CASE`; un
 identifiant de corrélation généré côté serveur est toujours retourné. Une
 valeur entrante absente ou invalide est remplacée, pas reflétée.
 
+L'en-tête entrant est `X-Correlation-ID`; une seule valeur au format UUID
+canonique est acceptée et normalisée en minuscules. Une valeur absente,
+multiple ou invalide est remplacée par un UUID généré côté serveur. Le même
+identifiant figure dans le Problem Details et l'en-tête de réponse
+`X-Correlation-ID`; il est ajouté au MDC et aux logs d'erreur, et ne sert
+jamais à authentifier ou autoriser un appel. Une erreur serveur inattendue
+utilise le code stable `INTERNAL_ERROR`.
+
 Codes HTTP proposés :
 
 | HTTP | Usage |
@@ -106,7 +114,7 @@ Content-Type: application/problem+json
   "status": 400,
   "detail": "One or more request fields are invalid.",
   "code": "VALIDATION_FAILED",
-  "correlationId": "01JEXAMPLE",
+  "correlationId": "a8a2e287-b820-4f74-9e6f-686b2d7e5b91",
   "errors": [
     {"field": "name", "code": "NOT_BLANK"}
   ]
@@ -211,7 +219,7 @@ Content-Type: application/problem+json
   "status": 409,
   "detail": "The key was already used for a different request.",
   "code": "IDEMPOTENCY_KEY_REUSED",
-  "correlationId": "01JEXAMPLE"
+  "correlationId": "a8a2e287-b820-4f74-9e6f-686b2d7e5b91"
 }
 ```
 

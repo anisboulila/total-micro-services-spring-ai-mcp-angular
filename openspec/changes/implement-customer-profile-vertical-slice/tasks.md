@@ -305,19 +305,20 @@
 
 ## 5. Contrats REST et sécurité
 
-- [ ] 5.1 **CPS-API-01** — Implémenter les erreurs RFC 9457
+- [x] 5.1 **CPS-API-01** — Implémenter les erreurs RFC 9457
 
 - **Objectif / résultat :** gestionnaire d’erreurs REST commun conforme au contrat.
 - **Dépendances :** CPS-APP-01.
 - **Concepts :** exception mapping, code stable, correlation ID.
 - **Apprenant :** compare le JSON à la spec et vérifie absence d’informations sensibles.
-- **Fichiers Copilot :** gestionnaire d’exceptions, DTO d’erreur et tests MockMvc.
+- **Fichiers Copilot :** gestionnaire RFC 9457 basé sur `ProblemDetail`, exception applicative, filtre de corrélation et tests MockMvc.
 - **Commandes :** `mvn -pl customer-service -am test`.
 - **Vérification / acceptation :** `application/problem+json`, `code`, `correlationId`, `errors` optionnel; aucun SQL, stack trace, token ou secret.
 - **Erreurs / diagnostic :** ne pas refléter un correlation ID fourni non valide; contrôler le corps d’erreur exact.
-- **Point d’arrêt :** attendre validation avant endpoints.
+- **Preuve observée :** après correction du contrôleur de test et de l’en-tête dupliqué, `mvn -pl customer-service -am test` a retourné `BUILD SUCCESS`; 5 tests ont été exécutés, sans échec, erreur ni test ignoré. Les deux tests MockMvc vérifient la réponse Problem Details stricte (400 et 500), `code`, `errors` optionnel, l’identifiant entrant UUID valide ou son remplacement, la présence d’un seul `X-Correlation-ID` et l’absence de SQL, token, secret et stack trace dans le corps. Aucun endpoint de production n’a été ajouté.
+- **Point d’arrêt :** ne pas commencer CPS-SEC-01 ni CPS-API-02.
 
-- [ ] 5.2 **CPS-SEC-01** — Valider les JWT dans customer-service
+- [x] 5.2 **CPS-SEC-01** — Valider les JWT dans customer-service
 
 - **Objectif / résultat :** Resource Server rejette jetons invalides indépendamment de la Gateway.
 - **Dépendances :** CPS-KC-04, CPS-KC-05, CPS-KC-06, CPS-APP-01.
@@ -327,7 +328,8 @@
 - **Commandes :** `mvn -pl customer-service -am test`.
 - **Vérification / acceptation :** token absent/expiré/mauvais issuer/audience refusé; `sub` dérivé du principal vérifié; rôles issus de `realm_access.roles`; header libre ignoré.
 - **Erreurs / diagnostic :** 401 = authentification/validation; 403 = rôle insuffisant; comparer issuer/audience aux métadonnées et au client.
-- **Point d’arrêt :** attendre matrice de sécurité verte.
+- **Preuve observée :** `mvn -pl customer-service -am test` a retourné `BUILD SUCCESS`; 13 tests ont été exécutés, sans échec, erreur ni test ignoré. Les 8 tests JWT passent par le vrai décodeur Nimbus et une JWKS HTTP synthétique : absence/expiration/signature/issuer/audience invalides sont rejetés, le token valide expose `sub` et `realm_access.roles`, et les headers `X-User-Id`/`X-Roles` sont ignorés. Les 2 tests RFC 9457 atteignent les probes de test sans ouvrir la sécurité de production. Vérification locale supplémentaire rapportée par l’apprenant : l’issuer et l’audience `customer-service` du vrai access token Keycloak étaient conformes; le probe avec le profil Maven `local-security-probe` a retourné 401 sans jeton, 200 avec le jeton (principal vérifié et autorité `CUSTOMER`), puis 401 avec la signature altérée. Aucun jeton ni valeur `sub` n’est conservé. Le profil charge le contrôleur uniquement depuis `target/test-classes`; il résout le 500 de route de probe absente sans modifier la validation JWT de production.
+- **Point d’arrêt :** ne pas commencer CPS-GW-01, CPS-API-02 ou une autre tâche sans validation explicite.
 
 - [ ] 5.3 **CPS-GW-01** — Sécuriser et router la Gateway
 

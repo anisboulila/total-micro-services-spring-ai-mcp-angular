@@ -30,6 +30,19 @@
         "http://127.0.0.1:8765/callback"
       ],
       "webOrigins": [],
+      "protocolMappers": [
+        {
+          "name": "customer-service-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "customer-service",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ],
       "attributes": {
         "pkce.code.challenge.method": "S256"
       }
