@@ -69,14 +69,53 @@ peut aussi annuler le bénéfice du modèle non bloquant.
 `spring-cloud-starter-gateway-server-webflux`, dont la version vient du BOM
 Spring Cloud 2025.0.1 géré par le parent Spring Boot 3.5.10. Il n'ajoute pas
 `spring-boot-starter-web`; `application.properties` fixe le port `8080`.
-Pour CPS-APP-02, le test de contexte a réussi, l'application a démarré et le
-healthcheck a retourné HTTP 200 avec `{"status":"UP"}`. Aucun routage métier
-n'est encore configuré.
+Pour CPS-GW-01, les routes Customer sont explicites et le test automatisé
+utilise un faux aval. Le healthcheck de l'application est séparé sur le port
+de gestion `8085`, que Compose ne publie pas.
 
 **Piège ou erreur fréquente**
 Ajouter `spring-boot-starter-web` par habitude dans une Gateway réactive, ou
 conclure que le healthcheck `UP` prouve que des routes vers Customer sont
 configurées et fonctionnelles.
+
+## Comment la Gateway protège-t-elle et route-t-elle les appels Customer?
+
+**Réponse courte**
+La Gateway est le point d'entrée HTTP : elle vérifie le bearer JWT à la
+périphérie, puis route seulement les chemins Customer explicitement prévus.
+`customer-service` valide ensuite le même jeton indépendamment.
+
+**Explication détaillée**
+Le filtre WebFlux Resource Server laisse passer une requête protégée seulement
+après vérification de la signature avec le JWKS de Keycloak, de l'issuer, des
+dates de validité et de l'audience `customer-service`. Cette validation
+authentifie le jeton, mais la Gateway ne décide pas si un utilisateur peut
+créer ou lire un profil : ces règles métier appartiennent au service
+propriétaire. Le Gateway conserve et transmet le header bearer original; les
+headers libres comme `X-User-Id` ou `X-Roles` ne créent pas d'identité
+authentifiée. Les services ne doivent pas les traiter comme faisant autorité.
+
+Les trois routes sont statiques : `GET` et `POST /api/v1/customers`, puis
+`GET /api/v1/customers/{id}`. L'absence de locator de découverte ou de route
+générique limite les chemins et services accessibles. Les Actuator ne sont
+pas routés vers les services; le healthcheck de la Gateway reste sur le port
+de gestion interne `8085`, séparé du port d'entrée `8080`.
+
+**Exemple concret dans notre projet**
+Les tests créent des JWT synthétiques signés par une clé RSA de test et
+exposent la clé publique par une JWKS locale. Ils utilisent le vrai décodeur
+du Resource Server, vérifient le transfert du bearer au faux Customer aval et
+confirment que l'absence de jeton avec `X-User-Id`/`X-Roles` forgés renvoie
+quand même 401. Les tests ne contactent pas Keycloak; le test manuel Compose
+reste nécessaire pour confirmer le comportement sur l'instance locale.
+
+**Piège ou erreur fréquente**
+Croire qu'une requête arrivée par la Gateway est automatiquement sûre pour le
+service aval, ou que le simple décodage du JWT prouve sa signature. Le service
+valide le JWT à nouveau. 401 indique une authentification/validation absente
+ou invalide; 403 concerne un principal authentifié refusé par une règle
+d'autorisation; 404 indique une route inconnue ou une ressource absente selon
+le composant qui répond.
 
 ## Quelle différence entre un Dockerfile, une image et un conteneur?
 

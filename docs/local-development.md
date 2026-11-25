@@ -74,7 +74,7 @@ Before the datasource was introduced in CPS-APP-01, the context test returned
 returned HTTP 200 and `{"status":"UP"}`, and the process stopped after
 `Ctrl+C`.
 
-### Run the minimal API Gateway
+### Run the API Gateway
 
 From the repository root, run the module test and start Gateway:
 
@@ -83,21 +83,78 @@ mvn -pl api-gateway -am test
 mvn -pl api-gateway spring-boot:run
 ```
 
-In a second terminal, check the Actuator health endpoint:
+The Gateway serves customer routes on port `8080`; its management server has a
+separate, non-published port (`8085`). In a second terminal, check the internal
+Actuator health endpoint:
 
 ```powershell
-Invoke-WebRequest http://localhost:8080/actuator/health
+Invoke-WebRequest http://localhost:8085/actuator/health
 ```
 
 The expected response is HTTP 200 with JSON `{"status":"UP"}`. Stop the
-application with `Ctrl+C` in the Maven terminal. This initial Gateway has no
-business routes. If startup reports that port 8080 is already in use, inspect
-the listener with `Get-NetTCPConnection -LocalPort 8080` before taking any
-action.
+application with `Ctrl+C` in the Maven terminal. If startup reports that port
+8080 or 8085 is already in use, inspect the listener before taking any action.
 
-During CPS-APP-02, the test command returned `BUILD SUCCESS`; startup reported
-`Started ApiGatewayApplication in 1.904 seconds`; the health request returned
-HTTP 200 and `{"status":"UP"}`, and the process stopped after `Ctrl+C`.
+The Gateway validates JWTs independently using the configured local issuer,
+JWKS and audience `customer-service`. In Compose it downloads public signing
+keys from `keycloak:8080`, while checking the issuer claim emitted as
+`http://localhost:8081/realms/customer-dev`. The Gateway forwards the original
+`Authorization: Bearer ...` header to Customer; it neither creates nor trusts
+identity/role headers. Customer validates the token again and makes business
+authorization decisions.
+
+Only these static routes are configured: `GET` and `POST
+/api/v1/customers`, and `GET /api/v1/customers/{id}`. There is no discovery
+locator, catch-all route, Account route, or proxied Actuator route. Actuator
+health is served on port 8085 for local/container readiness; Compose publishes
+only Gateway port 8080 to the host.
+
+`GatewaySecurityAndRoutingTests` signs synthetic JWTs with a test-only RSA key
+and serves the matching JWKS from a local HTTP stub. It exercises the real
+Gateway decoder and checks 401 for missing/invalid tokens, issuer, expiration,
+validity-time, and audience failures; it also checks the configured Customer
+routes, unchanged bearer forwarding, forged identity headers, and no route to
+Actuator or Account. The automated command returned `BUILD SUCCESS` with six
+tests and no failures, errors, or skips. This does not replace the manual
+Compose check below, nor does it contact Keycloak.
+
+To check the public entry point with the real local services, first inspect
+their state:
+
+```powershell
+docker compose ps
+```
+
+If any required service is not running/healthy, start them without removing
+their named volumes:
+
+```powershell
+docker compose up -d --build postgres keycloak customer-service api-gateway
+```
+
+Then call the protected Customer collection without a token:
+
+```powershell
+try {
+    $response = Invoke-WebRequest http://localhost:8080/api/v1/customers -ErrorAction Stop
+    [int]$response.StatusCode
+}
+catch {
+    if ($null -ne $_.Exception.Response) {
+        [int]$_.Exception.Response.StatusCode
+    }
+    else {
+        throw
+    }
+}
+```
+
+Expected result is `401`, even if Customer's business endpoint is not yet
+implemented: Gateway rejects the request before routing. A `404` instead
+requires checking the running Gateway image, exact path and Gateway logs; do
+not weaken authentication to mask it. Do not attach a token or print secrets
+for this unauthenticated check. A successful no-token request is not expected
+to return 200.
 
 ### Run Customer model and service unit tests
 

@@ -57,10 +57,15 @@ services:
     build:
       context: .
       dockerfile: api-gateway/Dockerfile
+    environment:
+      GATEWAY_SECURITY_ISSUER_URI: "http://localhost:8081/realms/customer-dev"
+      GATEWAY_SECURITY_JWK_SET_URI: "http://keycloak:8080/realms/customer-dev/protocol/openid-connect/certs"
+      GATEWAY_SECURITY_AUDIENCE: "customer-service"
+      GATEWAY_CUSTOMER_SERVICE_URI: "http://customer-service:8082"
     ports:
       - "127.0.0.1:8080:8080"
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/actuator/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8085/actuator/health"]
       interval: 10s
       timeout: 3s
       retries: 5

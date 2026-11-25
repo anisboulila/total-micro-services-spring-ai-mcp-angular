@@ -341,6 +341,7 @@
 - **Commandes :** `mvn -pl api-gateway -am test`; après démarrage, `Invoke-WebRequest http://localhost:8080/api/v1/customers`.
 - **Vérification / acceptation :** appel sans token 401; routes Customer statiques; token non réécrit en identité par header; aucune route Actuator exposée.
 - **Erreurs / diagnostic :** 404 peut signifier route absente, 401 filtre; examiner logs Gateway sans token.
+- **Preuve automatisée observée :** `mvn -pl api-gateway -am test` a retourné `BUILD SUCCESS`; 6 tests passent sans échec, erreur ou test ignoré. Les tests utilisent un vrai décodeur JWT, une JWKS synthétique locale et un faux aval pour vérifier le refus des jetons absents/invalides, issuer, expiration, `nbf` et audience, les routes Customer configurées, le transfert du bearer original, les headers forgés, et l'absence de route Actuator/Account. Le test manuel HTTP sans token via Compose reste à confirmer; la tâche n'est donc pas cochée.
 - **Point d’arrêt :** attendre preuve du refus avant API métier.
 
 - [ ] 5.4 **CPS-API-02** — Valider les champs du profil
