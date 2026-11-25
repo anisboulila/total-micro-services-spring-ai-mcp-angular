@@ -54,7 +54,7 @@ public class Customer {
     }
 
     private static String normalizeName(String name) {
-        String normalized = Objects.requireNonNull(name, "name").strip();
+        String normalized = CustomerName.normalize(Objects.requireNonNull(name, "name"));
         if (normalized.isEmpty() || normalized.length() > 120) {
             throw new IllegalArgumentException("name must contain between 1 and 120 characters");
         }

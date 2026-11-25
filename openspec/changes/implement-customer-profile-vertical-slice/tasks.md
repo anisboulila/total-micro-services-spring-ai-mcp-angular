@@ -331,7 +331,7 @@
 - **Preuve observée :** `mvn -pl customer-service -am test` a retourné `BUILD SUCCESS`; 13 tests ont été exécutés, sans échec, erreur ni test ignoré. Les 8 tests JWT passent par le vrai décodeur Nimbus et une JWKS HTTP synthétique : absence/expiration/signature/issuer/audience invalides sont rejetés, le token valide expose `sub` et `realm_access.roles`, et les headers `X-User-Id`/`X-Roles` sont ignorés. Les 2 tests RFC 9457 atteignent les probes de test sans ouvrir la sécurité de production. Vérification locale supplémentaire rapportée par l’apprenant : l’issuer et l’audience `customer-service` du vrai access token Keycloak étaient conformes; le probe avec le profil Maven `local-security-probe` a retourné 401 sans jeton, 200 avec le jeton (principal vérifié et autorité `CUSTOMER`), puis 401 avec la signature altérée. Aucun jeton ni valeur `sub` n’est conservé. Le profil charge le contrôleur uniquement depuis `target/test-classes`; il résout le 500 de route de probe absente sans modifier la validation JWT de production.
 - **Point d’arrêt :** ne pas commencer CPS-GW-01, CPS-API-02 ou une autre tâche sans validation explicite.
 
-- [ ] 5.3 **CPS-GW-01** — Sécuriser et router la Gateway
+- [x] 5.3 **CPS-GW-01** — Sécuriser et router la Gateway
 
 - **Objectif / résultat :** validation JWT en bordure et routes statiques Customer uniquement.
 - **Dépendances :** CPS-APP-02, CPS-SEC-01, CPS-APP-03, CPS-KC-04.
@@ -341,7 +341,8 @@
 - **Commandes :** `mvn -pl api-gateway -am test`; après démarrage, `Invoke-WebRequest http://localhost:8080/api/v1/customers`.
 - **Vérification / acceptation :** appel sans token 401; routes Customer statiques; token non réécrit en identité par header; aucune route Actuator exposée.
 - **Erreurs / diagnostic :** 404 peut signifier route absente, 401 filtre; examiner logs Gateway sans token.
-- **Preuve automatisée observée :** `mvn -pl api-gateway -am test` a retourné `BUILD SUCCESS`; 6 tests passent sans échec, erreur ou test ignoré. Les tests utilisent un vrai décodeur JWT, une JWKS synthétique locale et un faux aval pour vérifier le refus des jetons absents/invalides, issuer, expiration, `nbf` et audience, les routes Customer configurées, le transfert du bearer original, les headers forgés, et l'absence de route Actuator/Account. Le test manuel HTTP sans token via Compose reste à confirmer; la tâche n'est donc pas cochée.
+- **Preuve automatisée observée :** `mvn -pl api-gateway -am test` a retourné `BUILD SUCCESS`; 6 tests passent sans échec, erreur ou test ignoré. Les tests utilisent un vrai décodeur JWT, une JWKS synthétique locale et un faux aval pour vérifier le refus des jetons absents/invalides, issuer, expiration, `nbf` et audience, les routes Customer configurées, le transfert du bearer original, les headers forgés, et l'absence de route Actuator/Account. Après correction de la sonde de santé, les 6 tests de `GatewaySecurityAndRoutingTests`, dont le nouveau test des ports de gestion et public, ont réussi dans VS Code.
+- **Preuve manuelle rapportée :** après reconstruction de la Gateway via Compose, l'apprenant a confirmé son état `healthy` et la réponse HTTP 401 sans jeton à `http://localhost:8080/api/v1/customers`.
 - **Point d’arrêt :** attendre preuve du refus avant API métier.
 
 - [ ] 5.4 **CPS-API-02** — Valider les champs du profil

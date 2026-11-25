@@ -107,7 +107,9 @@ Only these static routes are configured: `GET` and `POST
 /api/v1/customers`, and `GET /api/v1/customers/{id}`. There is no discovery
 locator, catch-all route, Account route, or proxied Actuator route. Actuator
 health is served on port 8085 for local/container readiness; Compose publishes
-only Gateway port 8080 to the host.
+only Gateway port 8080 to the host. The exact `/actuator/health` path is
+permitted without a token for the internal healthcheck; it is not exposed or
+proxied on the public Gateway port. Other requests still require authentication.
 
 `GatewaySecurityAndRoutingTests` signs synthetic JWTs with a test-only RSA key
 and serves the matching JWKS from a local HTTP stub. It exercises the real
@@ -471,6 +473,13 @@ protocol mapper for the access token. Do not copy or share tokens while
 diagnosing this.
 
 ## Customer Resource Server JWT validation
+
+The Customer creation request and identity validator are prepared separately
+from the future production endpoint. They normalize and validate the name,
+reject unexpected JSON fields, and require an email and an explicitly verified
+email claim from a previously verified JWT. The validation probe in tests is
+test-only and does not create a Customer. The production POST controller and
+its integration with these validators are part of the next implementation task.
 
 `customer-service` validates bearer access tokens itself; access through the
 Gateway does not replace this check. Its local issuer is

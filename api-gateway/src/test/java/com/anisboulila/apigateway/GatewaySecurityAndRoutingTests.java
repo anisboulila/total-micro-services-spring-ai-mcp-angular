@@ -16,6 +16,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalManagementPort;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -51,6 +52,9 @@ class GatewaySecurityAndRoutingTests {
     @LocalServerPort
     private int gatewayPort;
 
+    @LocalManagementPort
+    private int managementPort;
+
     private WebTestClient client;
 
     @DynamicPropertySource
@@ -77,6 +81,25 @@ class GatewaySecurityAndRoutingTests {
     @AfterAll
     static void stopDownstream() {
         downstream.stop(0);
+    }
+
+    @Test
+    void servesHealthOnlyOnTheManagementPortWithoutAuthentication() {
+        WebTestClient.bindToServer()
+                .baseUrl("http://127.0.0.1:" + managementPort)
+                .build()
+                .get()
+                .uri("/actuator/health")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$.status").isEqualTo("UP");
+
+        client.get()
+                .uri("/actuator/health")
+                .exchange()
+                .expectStatus().isNotFound();
+
+        assertThat(downstreamRequestCount).hasValue(0);
     }
 
     @Test

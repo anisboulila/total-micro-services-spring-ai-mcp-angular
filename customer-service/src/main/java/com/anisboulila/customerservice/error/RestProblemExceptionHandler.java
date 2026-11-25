@@ -1,5 +1,6 @@
 package com.anisboulila.customerservice.error;
 
+import com.anisboulila.customerservice.api.InvalidCustomerFieldException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +72,9 @@ public class RestProblemExceptionHandler {
     public ResponseEntity<ProblemDetail> handleUnreadableRequest(
             HttpMessageNotReadableException exception,
             HttpServletRequest request) {
+        List<ApiProblemException.FieldError> errors = exception.getCause() instanceof InvalidCustomerFieldException fieldError
+                ? List.of(new ApiProblemException.FieldError(fieldError.getField(), fieldError.getCode()))
+                : List.of();
         String correlationId = CorrelationIdFilter.getOrCreateCorrelationId(request);
         LOGGER.warn("REST problem correlationId={} status={} code={}",
                 correlationId, HttpStatus.BAD_REQUEST.value(), "VALIDATION_FAILED");
@@ -79,7 +83,7 @@ public class RestProblemExceptionHandler {
                 "VALIDATION_FAILED",
                 "Invalid request",
                 "The request body is invalid.",
-                List.of(),
+                errors,
                 correlationId,
                 request);
     }
