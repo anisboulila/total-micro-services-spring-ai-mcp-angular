@@ -114,6 +114,7 @@
                         <configuration>
                             <includes>
                                 <include>**/CustomerServiceApplicationIT.java</include>
+                                <include>**/CustomerCreationPostgresIT.java</include>
                             </includes>
                         </configuration>
                         <executions>

@@ -2,6 +2,7 @@ package com.anisboulila.customerservice.error;
 
 import com.anisboulila.customerservice.api.InvalidCustomerFieldException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.hibernate.exception.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -9,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -25,6 +27,32 @@ public class RestProblemExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RestProblemExceptionHandler.class);
     private static final String VALIDATION_DETAIL = "One or more request fields are invalid.";
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ProblemDetail> handleIntegrityViolation(
+            DataIntegrityViolationException exception,
+            HttpServletRequest request) {
+        // Seules les contraintes uniques de création Customer ont une signification métier connue.
+        if ("POST".equals(request.getMethod())
+                && (request.getContextPath() + "/api/v1/customers").equals(request.getRequestURI())) {
+            for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+                if (cause instanceof ConstraintViolationException violation
+                        && "23505".equals(violation.getSQLState())) {
+                    if ("uk_customer_sub".equals(violation.getConstraintName())) {
+                        return handleApiProblem(new ApiProblemException(HttpStatus.CONFLICT,
+                                "CUSTOMER_PROFILE_EXISTS", "Profile already exists",
+                                "A customer profile already exists for this identity."), request);
+                    }
+                    if ("uk_customer_email_canonical".equals(violation.getConstraintName())) {
+                        return handleApiProblem(new ApiProblemException(HttpStatus.CONFLICT,
+                                "EMAIL_ALREADY_EXISTS", "Email already exists",
+                                "This email address is already associated with a customer profile."), request);
+                    }
+                }
+            }
+        }
+        return handleUnexpected(exception, request);
+    }
 
     @ExceptionHandler(ApiProblemException.class)
     public ResponseEntity<ProblemDetail> handleApiProblem(

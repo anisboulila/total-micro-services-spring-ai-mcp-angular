@@ -368,9 +368,10 @@
 - **Commandes :** `mvn -pl customer-service -am test`.
 - **Vérification / acceptation :** profil lié au `sub`/email du token, HTTP 201 avec représentation et `Location`; OPERATOR reçoit 403 `FORBIDDEN_PROFILE_CREATION` et aucune écriture.
 - **Erreurs / diagnostic :** claim absent vs contexte Security; examiner logs corrélés et ne jamais imprimer bearer.
+- **Preuve partielle :** le test manuel authentifié est passé par Gateway et Customer, puis a retourné 503 `PROFILE_CREATION_DISABLED` comme prévu. Le test PostgreSQL isolé `CustomerCreationPostgresIT` vérifie 201, `Location`, persistance et refus OPERATOR, avec décodage JWT simulé et fonctionnalité activée uniquement pour le test ; il ne valide pas Keycloak de bout en bout.
 - **Point d’arrêt :** attendre cas nominaux et refus avant conflits.
 
-- [ ] 5.6 **CPS-API-04** — Traduire les conflits d’identité
+- [x] 5.6 **CPS-API-04** — Traduire les conflits d’identité
 
 - **Objectif / résultat :** conflits `sub` et e-mail donnent erreurs stables.
 - **Dépendances :** CPS-API-03, CPS-DB-02.
@@ -380,6 +381,8 @@
 - **Commandes :** `mvn -pl customer-service -am test`.
 - **Vérification / acceptation :** `sub` existant => 409 `CUSTOMER_PROFILE_EXISTS`; email existant => 409 `EMAIL_ALREADY_EXISTS`; aucun email absent/non vérifié n’est traité comme erreur générique (`EMAIL_NOT_VERIFIED`).
 - **Erreurs / diagnostic :** ne pas convertir toute `DataIntegrityViolationException` en doublon email; inspecter la contrainte.
+- **Preuve automatisée :** la commande ciblée `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,CustomerApplicationServiceTest" "-Dit.test=CustomerCreationPostgresIT" verify` a retourné `BUILD SUCCESS` : 9 tests unitaires/MVC et 2 tests d'intégration réussis. PostgreSQL isolé a vérifié les deux conflits et l'absence de modification du profil existant ; le JWT reste simulé.
+- **Validation :** acceptée par l'apprenant sur les tests automatisés ; le test manuel avec Keycloak et Gateway est reporté. La tâche 5.5, dont dépend 5.6, reste ouverte.
 - **Point d’arrêt :** attendre les deux tests de conflit.
 
 ## 6. Idempotence et concurrence

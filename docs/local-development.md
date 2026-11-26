@@ -486,9 +486,30 @@ present. Profile creation is disabled by default: authenticated, authorized
 requests with valid input receive HTTP 503 `PROFILE_CREATION_DISABLED` until
 the feature is enabled. The test property `customer.profile-creation.enabled`
 explicitly enables it in isolated tests only. Do not enable it for normal use:
-duplicate conflict translation and idempotent retries remain unfinished tasks.
+idempotent retries and the remaining concurrency work are not yet implemented.
 The response `Location` identifies the new profile, but its GET endpoint is
 not yet implemented.
+
+Known PostgreSQL uniqueness violations are translated into RFC 9457 responses:
+`uk_customer_sub` returns HTTP 409 `CUSTOMER_PROFILE_EXISTS`, and
+`uk_customer_email_canonical` returns HTTP 409 `EMAIL_ALREADY_EXISTS`.
+Other integrity failures remain sanitized HTTP 500 errors. PostgreSQL JDBC
+server-error details are disabled for the application because duplicate-key
+details can contain the customer's subject or email; database-server logging
+and other logging configurations must also be managed separately.
+
+To run the focused controller/service tests and the isolated PostgreSQL test:
+
+```powershell
+mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,CustomerApplicationServiceTest" "-Dit.test=CustomerCreationPostgresIT" verify
+```
+
+The integration test creates a temporary PostgreSQL container, applies the
+real migration, enables creation only in its test context, and checks a 201,
+both 409 cases, unchanged stored data, operator rejection, and absence of the
+tested identity values from the application output. JWT decoding is mocked:
+this test does not validate Keycloak or Gateway integration. It requires a
+working Docker daemon and may need to download the test images.
 
 `customer-service` validates bearer access tokens itself; access through the
 Gateway does not replace this check. Its local issuer is

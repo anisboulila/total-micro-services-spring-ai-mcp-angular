@@ -6,11 +6,13 @@ import com.anisboulila.customerservice.error.RestProblemExceptionHandler;
 import com.anisboulila.customerservice.security.CustomerSecurityConfiguration;
 import com.anisboulila.customerservice.security.SecurityProblemWriter;
 import com.anisboulila.customerservice.service.CustomerApplicationService;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -18,11 +20,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.Mockito.*;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -130,6 +135,34 @@ class CustomerControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"));
         verifyNoInteractions(customerService);
+    }
+
+    @Test
+    void translatesOnlyKnownUniqueConstraintsWithoutExposingTechnicalDetails() throws Exception {
+        String[][] cases = {
+                {"uk_customer_sub", "23505", "409", "CUSTOMER_PROFILE_EXISTS"},
+                {"uk_customer_email_canonical", "23505", "409", "EMAIL_ALREADY_EXISTS"},
+                {"other_constraint", "23505", "500", "INTERNAL_ERROR"},
+                {"uk_customer_sub", "23514", "500", "INTERNAL_ERROR"}
+        };
+        for (String[] testCase : cases) {
+            SQLException sql = new SQLException("secret SQL details", testCase[1]);
+            ConstraintViolationException cause =
+                    new ConstraintViolationException("database failure", sql, testCase[0]);
+            doThrow(new DataIntegrityViolationException("secret database details", cause))
+                    .when(customerService).createFromVerifiedIdentity("verified-sub", "Ada", "ADA@example.test");
+
+            mockMvc.perform(post("/api/v1/customers")
+                            .header("Authorization", "Bearer customer-token")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"Ada\"}"))
+                    .andExpect(status().is(Integer.parseInt(testCase[2])))
+                    .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                    .andExpect(jsonPath("$.code").value(testCase[3]))
+                    .andExpect(jsonPath("$.correlationId").isNotEmpty())
+                    .andExpect(content().string(not(containsString("secret"))))
+                    .andExpect(content().string(not(containsString(testCase[0]))));
+        }
     }
 
     private static Jwt jwt(List<String> roles, boolean emailVerified) {

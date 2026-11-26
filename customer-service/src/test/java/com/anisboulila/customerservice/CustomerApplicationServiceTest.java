@@ -33,14 +33,14 @@ class CustomerApplicationServiceTest {
         Instant now = Instant.parse("2026-10-16T15:00:00Z");
         CustomerApplicationService service = new CustomerApplicationService(
                 customerRepository, Clock.fixed(now, ZoneOffset.UTC));
-        when(customerRepository.save(any(Customer.class)))
+        when(customerRepository.saveAndFlush(any(Customer.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         Customer customer = service.createFromVerifiedIdentity(
                 "oidc-subject", "  Ada Lovelace  ", "  ADA@Example.Test ");
 
         ArgumentCaptor<Customer> savedCustomer = ArgumentCaptor.forClass(Customer.class);
-        verify(customerRepository).save(savedCustomer.capture());
+        verify(customerRepository).saveAndFlush(savedCustomer.capture());
         assertSame(customer, savedCustomer.getValue());
         assertEquals("Ada Lovelace", customer.getName());
         assertEquals("ada@example.test", customer.getEmail());

@@ -22,6 +22,7 @@ public class CustomerApplicationService {
     @Transactional
     public Customer createFromVerifiedIdentity(String sub, String name, String email) {
         Customer customer = Customer.create(sub, name, email, clock.instant());
-        return customerRepository.save(customer);
+        // Déclencher les contraintes avant la fin de la transaction pour traduire les conflits.
+        return customerRepository.saveAndFlush(customer);
     }
 }
