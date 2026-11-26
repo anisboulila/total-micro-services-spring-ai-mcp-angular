@@ -417,12 +417,14 @@
 
 - **Objectif / résultat :** prouver l’unicité en course sur PostgreSQL.
 - **Dépendances :** CPS-IDEM-02, CPS-DB-02.
-- **Concepts :** isolation/contrainte unique et concurrence multi-instance.
+- **Concepts :** verrou consultatif PostgreSQL transactionnel, isolation READ COMMITTED, contrainte unique et concurrence multi-instance.
 - **Apprenant :** lance tests avec barrières concurrentes.
-- **Fichiers Copilot :** test d’intégration concurrente.
-- **Commandes :** `mvn -pl customer-service "-Dtest=*Concurrent*Test" test`.
+- **Fichiers Copilot :** service et repository d'idempotence, test d’intégration concurrente, documentation et décision TD-05.
+- **Commandes :** `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,CustomerCreationDisabledTest,CustomerApplicationServiceTest" "-Dit.test=CustomerCreationPostgresIT" verify`.
 - **Vérification / acceptation :** N demandes identiques produisent un Customer et toutes reçoivent la réponse initiale, sans 500 parasite.
 - **Erreurs / diagnostic :** tests séquentiels/H2 ne prouvent pas la concurrence; confirmer PostgreSQL Testcontainers et synchronisation effective.
+- **Preuve automatisée :** commande ciblée réussie : 12 tests unitaires/MVC et 13 tests d'intégration PostgreSQL isolé. Les tests observent les verrous en attente dans PostgreSQL et vérifient le rejeu exact de quatre demandes, le conflit de contenu, le rollback du premier traitement, la séparation entre acteurs et le remplacement d'une clé expirée. Ils utilisent plusieurs connexions mais un seul contexte applicatif ; le JWT est simulé, sans test de deux instances ou parcours Gateway/Keycloak. La création reste désactivée par défaut.
+- **Limite existante :** l'expiration est calculée avant le commit, et non exactement sept jours après le commit comme indiqué par TD-05.
 - **Point d’arrêt :** attendre résultats avant lecture.
 
 ## 7. Lectures, tests d’intégration et bout en bout

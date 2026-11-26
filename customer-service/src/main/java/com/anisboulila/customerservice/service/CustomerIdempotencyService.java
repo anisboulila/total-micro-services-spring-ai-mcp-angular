@@ -7,8 +7,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.http.HttpStatus;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -36,11 +38,13 @@ public class CustomerIdempotencyService {
         this.clock = clock;
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public CreationResult create(String sub, String name, String email, String key) {
         // L'empreinte utilise les valeurs effectives, jamais le token ou la clé.
         String hash = fingerprint(new CanonicalRequest(OPERATION, sub, name,
                 email.strip().toLowerCase(Locale.ROOT)));
+        // Toutes les instances prennent le même verrou avant de rechercher ou créer le résultat.
+        idempotency.lock(lockId(sub, OPERATION, key));
         var stored = idempotency.findForUpdate(sub, OPERATION, key);
         Instant now = clock.instant();
         if (stored.isPresent()) {
@@ -67,10 +71,28 @@ public class CustomerIdempotencyService {
     }
 
     private String fingerprint(CanonicalRequest request) {
+        return HexFormat.of().formatHex(digest(request));
+    }
+
+    private byte[] digest(Object value) {
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(serialize(request).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
+            return MessageDigest.getInstance("SHA-256")
+                    .digest(serialize(value).getBytes(StandardCharsets.UTF_8));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
+
+    private long lockId(String sub, String operation, String key) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            // Le préfixage par longueur rend l'encodage stable et évite les concaténations ambiguës.
+            for (String part : new String[] {"customer-idempotency-v1", sub, operation, key}) {
+                byte[] bytes = part.getBytes(StandardCharsets.UTF_8);
+                digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
+                digest.update(bytes);
+            }
+            return ByteBuffer.wrap(digest.digest()).getLong();
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);
         }

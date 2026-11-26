@@ -37,7 +37,7 @@ public class CustomerController {
     public ResponseEntity<String> create(@AuthenticationPrincipal Jwt jwt,
                                          @Valid @RequestBody CreateCustomerRequest request,
                                          @RequestHeader(value = "Idempotency-Key", required = false) String key) {
-        // Garde temporaire : l'idempotence concurrente n'est pas encore validée.
+        // Garde temporaire jusqu'à la validation complète du parcours de création.
         if (!creationEnabled) {
             throw new ApiProblemException(HttpStatus.SERVICE_UNAVAILABLE, "PROFILE_CREATION_DISABLED",
                     "Profile creation unavailable", "Profile creation is not enabled.");

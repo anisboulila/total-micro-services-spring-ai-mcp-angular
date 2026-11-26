@@ -18,6 +18,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -28,10 +29,17 @@ import java.time.Duration;
 import java.time.Clock;
 import java.time.Instant;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.ArgumentMatchers.*;
@@ -250,6 +258,180 @@ class CustomerCreationPostgresIT {
         assertEquals(0, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM cps_customer_schema.customer_idempotency", Integer.class));
         create("first", "retry-key", "{\"name\":\"Ada\"}").andExpect(status().isCreated());
+    }
+
+    @Test
+    void concurrentIdenticalRequestsWaitAndReplayExactly() throws Exception {
+        CountDownLatch inserted = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        pauseFirstInsert(inserted, release, false);
+        var executor = Executors.newFixedThreadPool(4);
+        try {
+            Future<MockHttpServletResponse> first = executor.submit(() -> response("first", "race-key", "Ada"));
+            assertTrue(inserted.await(10, TimeUnit.SECONDS), "first transaction did not insert");
+            List<Future<MockHttpServletResponse>> retries = new ArrayList<>();
+            for (int i = 0; i < 3; i++) {
+                retries.add(executor.submit(() -> response("first", "race-key", "Ada")));
+            }
+            awaitAdvisoryWaiters(3);
+            release.countDown();
+            var original = first.get(10, TimeUnit.SECONDS);
+            assertEquals(201, original.getStatus());
+            for (var retry : retries) {
+                var replay = retry.get(10, TimeUnit.SECONDS);
+                assertEquals(original.getStatus(), replay.getStatus());
+                assertEquals(original.getContentAsString(), replay.getContentAsString());
+                assertEquals(original.getHeader("Location"), replay.getHeader("Location"));
+            }
+            assertCounts(1, 1);
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void concurrentDifferentContentWaitsThenReturnsConflict() throws Exception {
+        CountDownLatch inserted = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        pauseFirstInsert(inserted, release, false);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> response("first", "race-key", "Ada"));
+            assertTrue(inserted.await(10, TimeUnit.SECONDS));
+            var different = executor.submit(() -> response("first", "race-key", "Grace"));
+            awaitAdvisoryWaiters(1);
+            release.countDown();
+            assertEquals(201, first.get(10, TimeUnit.SECONDS).getStatus());
+            var conflict = different.get(10, TimeUnit.SECONDS);
+            assertEquals(409, conflict.getStatus());
+            assertTrue(conflict.getContentAsString().contains("IDEMPOTENCY_KEY_REUSED"));
+            assertCounts(1, 1);
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void waitingRequestCanCreateAfterFirstTransactionRollsBack() throws Exception {
+        CountDownLatch inserted = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        pauseFirstInsert(inserted, release, true);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> response("first", "race-key", "Ada"));
+            assertTrue(inserted.await(10, TimeUnit.SECONDS));
+            var retry = executor.submit(() -> response("first", "race-key", "Ada"));
+            awaitAdvisoryWaiters(1);
+            release.countDown();
+            assertEquals(500, first.get(10, TimeUnit.SECONDS).getStatus());
+            var successful = retry.get(10, TimeUnit.SECONDS);
+            assertEquals(201, successful.getStatus());
+            var replay = response("first", "race-key", "Ada");
+            assertEquals(successful.getContentAsString(), replay.getContentAsString());
+            assertEquals(successful.getHeader("Location"), replay.getHeader("Location"));
+            assertCounts(1, 1);
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void differentActorWithSameKeyCanProceedWhileFirstTransactionIsOpen() throws Exception {
+        CountDownLatch inserted = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        pauseFirstInsert(inserted, release, false);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> response("first", "race-key", "Ada"));
+            assertTrue(inserted.await(10, TimeUnit.SECONDS));
+            var otherActor = executor.submit(() -> response("second", "race-key", "Grace"));
+            assertEquals(201, otherActor.get(10, TimeUnit.SECONDS).getStatus());
+            release.countDown();
+            assertEquals(201, first.get(10, TimeUnit.SECONDS).getStatus());
+            assertCounts(2, 2);
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void concurrentRequestsReplaceExpiredRecordOnlyOnce() throws Exception {
+        create("first", "expiry-race", "{\"name\":\"Ada\"}").andExpect(status().isCreated());
+        jdbcTemplate.update("UPDATE cps_customer_schema.customer_idempotency SET actor_sub = ? WHERE actor_sub = ?",
+                "subject-two", "subject-one");
+        when(clock.instant()).thenReturn(START.plus(Duration.ofDays(7)));
+        CountDownLatch inserted = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        pauseFirstInsert(inserted, release, false);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> response("second", "expiry-race", "Grace"));
+            assertTrue(inserted.await(10, TimeUnit.SECONDS));
+            var retry = executor.submit(() -> response("second", "expiry-race", "Grace"));
+            awaitAdvisoryWaiters(1);
+            release.countDown();
+            var original = first.get(10, TimeUnit.SECONDS);
+            var replay = retry.get(10, TimeUnit.SECONDS);
+            assertEquals(201, original.getStatus());
+            assertEquals(original.getStatus(), replay.getStatus());
+            assertEquals(original.getContentAsString(), replay.getContentAsString());
+            assertEquals(original.getHeader("Location"), replay.getHeader("Location"));
+            assertCounts(2, 1);
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    private void pauseFirstInsert(CountDownLatch inserted, CountDownLatch release, boolean fail) {
+        AtomicInteger calls = new AtomicInteger();
+        doAnswer(invocation -> {
+            Object result = invocation.callRealMethod();
+            if (calls.getAndIncrement() == 0) {
+                inserted.countDown();
+                if (!release.await(15, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("timed out waiting to release transaction");
+                }
+                if (fail) {
+                    throw new IllegalStateException("simulated failure after idempotency insert");
+                }
+            }
+            return result;
+        }).when(idempotencyRepository).save(anyString(), anyString(), anyString(), anyString(),
+                any(), anyInt(), anyString(), anyString(), any(), any());
+    }
+
+    private void awaitAdvisoryWaiters(int expected) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted", Integer.class);
+            if (count != null && count >= expected) {
+                return;
+            }
+            Thread.sleep(20);
+        }
+        throw new AssertionError("Expected " + expected + " PostgreSQL advisory lock waiters");
+    }
+
+    private MockHttpServletResponse response(String token, String key, String name) throws Exception {
+        return create(token, key, "{\"name\":\"" + name + "\"}").andReturn().getResponse();
+    }
+
+    private void assertCounts(int customers, int records) {
+        assertEquals(customers, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cps_customer_schema.customer", Integer.class));
+        assertEquals(records, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cps_customer_schema.customer_idempotency", Integer.class));
     }
 
     private org.springframework.test.web.servlet.ResultActions create(String token, String key, String body)

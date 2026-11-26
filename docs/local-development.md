@@ -485,23 +485,32 @@ The Customer POST controller integrates those validators and requires the
 present. Profile creation is disabled by default: authenticated, authorized
 requests with valid input receive HTTP 503 `PROFILE_CREATION_DISABLED` until
 the feature is enabled. The test property `customer.profile-creation.enabled`
-explicitly enables it in isolated tests only. Do not enable it for normal use:
-concurrent idempotent retries are not yet implemented or verified.
+explicitly enables it in isolated tests only. Do not enable it for normal use
+until the complete creation flow has been validated.
 The response `Location` identifies the new profile, but its GET endpoint is
 not yet implemented.
 
 The first idempotency increment persists a successful response and its SHA-256
 request fingerprint together with the Customer in one database transaction.
 Its unique key is scoped to the verified subject and operation in this service's
-database, and its expiration is seven days after creation. The exact JSON
+database, and its expiration is seven days after the timestamp recorded just
+before the response is inserted, not necessarily seven days after commit.
+This is a known gap relative to TD-05's seven days after commit. The exact JSON
 response, status and Location are stored; bearer tokens are not. An enabled
 test request must include a non-blank `Idempotency-Key` of at most 255
 characters. Sequential retries replay the saved response for an identical
 effective request, or return 409 `IDEMPOTENCY_KEY_REUSED` for different
 content. An expired key may be reused, but the existing Customer uniqueness
 constraints still apply. If the new creation fails, the expired record's
-removal rolls back. **Concurrent first requests are not coordinated yet**;
-keeping the creation flag off is essential until that work is complete.
+removal rolls back. Concurrent requests use a PostgreSQL transaction-level
+advisory lock derived from the actor, operation and key before checking or
+creating the result. A waiting request reads the committed result under
+READ COMMITTED; a rollback releases the lock and permits a retry. The full
+values still determine the stored result, so a lock hash collision can only
+cause unnecessary waiting. Requests must all use the same PostgreSQL database
+and lock protocol; keep creation disabled during mixed-version deployments.
+Waiting transactions occupy database connections; database lock timeouts and
+other failures are not successful replays.
 The V2 migration creates a new table when Flyway next starts the updated service,
 including on an existing database; it does not delete existing profiles.
 
@@ -516,18 +525,21 @@ and other logging configurations must also be managed separately.
 To run the focused controller/service tests and the isolated PostgreSQL test:
 
 ```powershell
-mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,CustomerApplicationServiceTest" "-Dit.test=CustomerCreationPostgresIT" verify
+mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,CustomerCreationDisabledTest,CustomerApplicationServiceTest" "-Dit.test=CustomerCreationPostgresIT" verify
 ```
 
 The integration test creates a temporary PostgreSQL container, applies the
 real migration, enables creation only in its test context, and checks a 201,
 both 409 cases, unchanged stored data, operator rejection, the persisted
 response, sequential replay and conflict, actor scope, the seven-day expiry
-boundary, and rollback of both inserts after a simulated failure. It also
-checks absence of the tested identity values from application
-output. JWT decoding is mocked:
-this test does not validate Keycloak or Gateway integration. It requires a
-working Docker daemon and may need to download the test images.
+boundary, and rollback of both inserts after a simulated failure. Concurrent
+tests use separate database connections and observe PostgreSQL lock waiters:
+they cover exact replay, conflicting content, rollback, actor isolation and
+expired-key replacement. They run in one application context, not separate
+application instances. The suite also checks absence of the tested identity
+values from application output. JWT decoding is mocked: this test does not
+validate Keycloak or Gateway integration. It requires a working Docker daemon
+and may need to download the test images.
 
 `customer-service` validates bearer access tokens itself; access through the
 Gateway does not replace this check. Its local issuer is

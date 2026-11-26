@@ -177,9 +177,12 @@ rejoue le résultat initial; contenu différent avec la même clé retourne HTTP
   espaces JSON et les en-têtes de transport. Les champs canoniques sont
   sérialisés dans l’ordre défini du DTO; aucune dépendance à l’ordre des
   propriétés d’entrée. Ne pas journaliser la clé ni le contenu sensible.
-- Une contrainte unique sur `(actor_sub, operation, idempotency_key)` arbitre
-  les courses multi-instances dans chaque base de service; le service
-  propriétaire est implicite. La transaction qui crée la ressource écrit aussi
+- Pour Customer, un verrou consultatif PostgreSQL transactionnel, calculé sur
+  l'acteur, l'opération et la clé, coordonne les courses multi-instances avant
+  toute lecture ou création. Toutes les instances doivent utiliser le même
+  protocole et la même base. La contrainte unique sur
+  `(actor_sub, operation, idempotency_key)` reste une protection de la base;
+  le service propriétaire est implicite. La transaction qui crée la ressource écrit aussi
   la clé, l’empreinte, l’échéance UTC, le statut HTTP et le corps exact du
   succès; aucun bearer token n’est stocké. Ne persister que les succès. Les
   validations rejetées et erreurs transitoires avant commit ne consomment pas
@@ -190,6 +193,14 @@ rejoue le résultat initial; contenu différent avec la même clé retourne HTTP
   l’enregistrement expiré avant une nouvelle commande; le nettoyage physique
   peut être différé. Cela peut créer une nouvelle ressource Account après
   sept jours.
+
+Le verrou Customer utilise les 64 premiers bits de SHA-256 d'un encodage
+versionné et préfixé par longueur du périmètre. Une collision peut sérialiser
+deux demandes distinctes sans mélanger leurs résultats, recherchés avec les
+valeurs complètes. Le verrou est libéré au commit ou rollback; la transaction
+de création utilise `READ COMMITTED` afin que la lecture après attente voie le
+commit gagnant. Toute modification du protocole nécessite une stratégie de
+déploiement coordonnée entre instances.
 
 Exemples proposés :
 

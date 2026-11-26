@@ -35,6 +35,10 @@ public class CustomerIdempotencyRepository {
                 Timestamp.from(createdAt), Timestamp.from(expiresAt));
     }
 
+    public void lock(long lockId) {
+        jdbcTemplate.query("SELECT pg_advisory_xact_lock(?)", rs -> null, lockId);
+    }
+
     public Optional<StoredResult> findForUpdate(String sub, String operation, String key) {
         return jdbcTemplate.query("""
                 SELECT request_hash, response_status, response_body, response_location, expires_at
