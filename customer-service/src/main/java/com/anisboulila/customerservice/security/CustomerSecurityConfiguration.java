@@ -4,11 +4,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
@@ -43,18 +47,28 @@ public class CustomerSecurityConfiguration {
                 "UNAUTHORIZED",
                 "Unauthorized",
                 "Authentication is required or the bearer token is invalid.");
-        AccessDeniedHandler problemAccessDeniedHandler = (request, response, failure) -> problemWriter.write(
-                request,
-                response,
-                HttpStatus.FORBIDDEN,
-                "FORBIDDEN",
-                "Forbidden",
-                "The authenticated user is not allowed to access this resource.");
+        AccessDeniedHandler problemAccessDeniedHandler = (request, response, failure) -> {
+            Authentication actor = SecurityContextHolder.getContext().getAuthentication();
+            boolean operatorCreation = "POST".equals(request.getMethod())
+                    && (request.getContextPath() + "/api/v1/customers").equals(request.getRequestURI())
+                    && hasAuthority(actor, "OPERATOR");
+            problemWriter.write(request, response, HttpStatus.FORBIDDEN,
+                    operatorCreation ? "FORBIDDEN_PROFILE_CREATION" : "FORBIDDEN",
+                    "Forbidden",
+                    operatorCreation ? "Operators cannot create customer profiles."
+                            : "The authenticated user is not allowed to access this resource.");
+        };
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        // L'autorisation précède la lecture du corps et refuse aussi le double rôle.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/customers").access((authentication, context) -> {
+                            Authentication actor = authentication.get();
+                            return new AuthorizationDecision(hasAuthority(actor, "CUSTOMER")
+                                    && !hasAuthority(actor, "OPERATOR"));
+                        })
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(problemEntryPoint)
@@ -64,6 +78,12 @@ public class CustomerSecurityConfiguration {
                         .accessDeniedHandler(problemAccessDeniedHandler)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
         return http.build();
+    }
+
+    private static boolean hasAuthority(Authentication authentication, String authority) {
+        return authentication != null && authentication.isAuthenticated()
+                && authentication.getAuthorities().stream()
+                .anyMatch(granted -> authority.equals(granted.getAuthority()));
     }
 
     @Bean

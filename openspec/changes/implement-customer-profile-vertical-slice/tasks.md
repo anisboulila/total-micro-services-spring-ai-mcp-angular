@@ -345,7 +345,7 @@
 - **Preuve manuelle rapportée :** après reconstruction de la Gateway via Compose, l'apprenant a confirmé son état `healthy` et la réponse HTTP 401 sans jeton à `http://localhost:8080/api/v1/customers`.
 - **Point d’arrêt :** attendre preuve du refus avant API métier.
 
-- [ ] 5.4 **CPS-API-02** — Valider les champs du profil
+- [x] 5.4 **CPS-API-02** — Valider les champs du profil
 
 - **Objectif / résultat :** validator du DTO applique les décisions retenues.
 - **Dépendances :** CPS-API-01, CPS-SEC-01.
@@ -355,6 +355,7 @@
 - **Commandes :** `mvn -pl customer-service -am test`.
 - **Vérification / acceptation :** `name` trimé, longueur 1–120; `sub`/email dans le corps rejetés `VALIDATION_FAILED`; email absent/non vérifié `EMAIL_NOT_VERIFIED`.
 - **Erreurs / diagnostic :** tester longueur après trim et claim absent distinct du champ invalide.
+- **Preuve observée :** l’apprenant a exécuté `mvn -pl customer-service -am test` et rapporté `BUILD SUCCESS` : 21 tests, sans échec, erreur ni test ignoré. Les tests de validation couvrent notamment les limites du nom après normalisation, le rejet des champs réservés et l’absence ou la non-vérification de l’e-mail. Le contrôleur de validation est réservé aux tests; aucun POST métier n’a encore été ajouté.
 - **Point d’arrêt :** attendre tests DTO avant POST.
 
 - [ ] 5.5 **CPS-API-03** — Créer un profil Customer

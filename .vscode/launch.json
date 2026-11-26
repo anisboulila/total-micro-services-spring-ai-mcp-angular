@@ -4,7 +4,20 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
+        {
+            "type": "java",
+            "name": "Attacher Gateway Docker",
+            "request": "attach",
+            "hostName": "127.0.0.1",
+            "port": 5006
+        },
+        {
+            "type": "java",
+            "name": "Attacher Customer Docker",
+            "request": "attach",
+            "hostName": "127.0.0.1",
+            "port": 5007
+        },
         {
             "type": "java",
             "name": "Attacher Customer local",

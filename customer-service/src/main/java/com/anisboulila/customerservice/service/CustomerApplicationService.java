@@ -3,6 +3,7 @@ package com.anisboulila.customerservice.service;
 import com.anisboulila.customerservice.domain.Customer;
 import com.anisboulila.customerservice.repository.CustomerRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 
@@ -17,6 +18,8 @@ public class CustomerApplicationService {
         this.clock = clock;
     }
 
+    // La sauvegarde et son résultat appartiennent à une même transaction.
+    @Transactional
     public Customer createFromVerifiedIdentity(String sub, String name, String email) {
         Customer customer = Customer.create(sub, name, email, clock.instant());
         return customerRepository.save(customer);

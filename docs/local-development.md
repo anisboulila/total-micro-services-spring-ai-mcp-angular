@@ -478,8 +478,17 @@ The Customer creation request and identity validator are prepared separately
 from the future production endpoint. They normalize and validate the name,
 reject unexpected JSON fields, and require an email and an explicitly verified
 email claim from a previously verified JWT. The validation probe in tests is
-test-only and does not create a Customer. The production POST controller and
-its integration with these validators are part of the next implementation task.
+test-only and does not create a Customer.
+
+The Customer POST controller integrates those validators and requires the
+`CUSTOMER` role while rejecting `OPERATOR`, including when both roles are
+present. Profile creation is disabled by default: authenticated, authorized
+requests with valid input receive HTTP 503 `PROFILE_CREATION_DISABLED` until
+the feature is enabled. The test property `customer.profile-creation.enabled`
+explicitly enables it in isolated tests only. Do not enable it for normal use:
+duplicate conflict translation and idempotent retries remain unfinished tasks.
+The response `Location` identifies the new profile, but its GET endpoint is
+not yet implemented.
 
 `customer-service` validates bearer access tokens itself; access through the
 Gateway does not replace this check. Its local issuer is
