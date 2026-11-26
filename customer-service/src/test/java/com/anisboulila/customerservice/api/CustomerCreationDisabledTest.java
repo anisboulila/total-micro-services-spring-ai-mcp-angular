@@ -4,7 +4,7 @@ import com.anisboulila.customerservice.error.CorrelationIdFilter;
 import com.anisboulila.customerservice.error.RestProblemExceptionHandler;
 import com.anisboulila.customerservice.security.CustomerSecurityConfiguration;
 import com.anisboulila.customerservice.security.SecurityProblemWriter;
-import com.anisboulila.customerservice.service.CustomerApplicationService;
+import com.anisboulila.customerservice.service.CustomerIdempotencyService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -34,7 +34,7 @@ class CustomerCreationDisabledTest {
     private JwtDecoder jwtDecoder;
 
     @MockitoBean
-    private CustomerApplicationService customerService;
+    private CustomerIdempotencyService customerService;
 
     @Test
     void creationIsDisabledByDefaultWithoutSaving() throws Exception {

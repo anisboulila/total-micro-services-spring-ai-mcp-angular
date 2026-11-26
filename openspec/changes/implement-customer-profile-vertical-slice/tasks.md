@@ -397,6 +397,7 @@
 - **Commandes :** `mvn -pl customer-service -am verify`.
 - **Vérification / acceptation :** portée acteur/opération/service; réponse HTTP/corps stockés avec la ressource; expiration UTC de 7 jours; aucun token persisté/loggé.
 - **Erreurs / diagnostic :** ressource sans clé ou clé sans ressource révèle transaction non atomique.
+- **Preuve automatisée :** `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,CustomerCreationDisabledTest,CustomerApplicationServiceTest" "-Dit.test=CustomerCreationPostgresIT" verify` a retourné `BUILD SUCCESS` : 11 tests ciblés et 4 tests PostgreSQL isolés réussis. Les tests vérifient la réponse stockée, l'empreinte, la portée, les sept jours et l'annulation des deux écritures après une erreur simulée. La création reste désactivée par défaut ; rejeu et concurrence restent à implémenter.
 - **Point d’arrêt :** attendre la preuve du commit atomique.
 
 - [ ] 6.2 **CPS-IDEM-02** — Tester rejeu, conflit et expiration

@@ -246,7 +246,7 @@ mvn -pl customer-service -am -Pflyway-testcontainers verify
 `flyway-compose-postgres` connects from the host to the Compose-published
 PostgreSQL endpoint. It runs two integration tests in the shared `customer_db`:
 the test-only `SELECT 1` migration in `cps_flyway_probe`, and the business
-migration `V1__create_customer.sql` in the dedicated schema
+migrations in the dedicated schema
 `cps_customer_schema`. Neither schema is an isolated database. The schemas
 and their `flyway_schema_history` tables persist after the tests; the Customer
 test inserts are rolled back by their test transactions and it never resets
@@ -275,8 +275,8 @@ migration history do.
 that Flyway records version `1`, and exercises an invalid migration in a
 separate schema to confirm startup fails with a Flyway cause. The container is
 removed after the test and the Compose database is not used. The main
-`src/main/resources/db/migration` location contains the business migration
-`V1__create_customer.sql`; the proof and invalid scripts remain under
+`src/main/resources/db/migration` location contains the business migrations
+`V1__create_customer.sql` and `V2__create_customer_idempotency.sql`; the proof and invalid scripts remain under
 `src/test/resources`.
 
 During CPS-DB-01, the default `verify` returned `BUILD SUCCESS` for compilation
@@ -490,6 +490,17 @@ idempotent retries and the remaining concurrency work are not yet implemented.
 The response `Location` identifies the new profile, but its GET endpoint is
 not yet implemented.
 
+The first idempotency increment persists a successful response and its SHA-256
+request fingerprint together with the Customer in one database transaction.
+Its unique key is scoped to the verified subject and operation in this service's
+database, and its expiration is seven days after creation. The exact JSON
+response, status and Location are stored; bearer tokens are not. An enabled
+test request must include a non-blank `Idempotency-Key` of at most 255
+characters. **Replaying stored responses, expiration handling and concurrent
+requests are not implemented yet**; keeping the creation flag off is essential.
+The V2 migration creates a new table when Flyway next starts the updated service,
+including on an existing database; it does not delete existing profiles.
+
 Known PostgreSQL uniqueness violations are translated into RFC 9457 responses:
 `uk_customer_sub` returns HTTP 409 `CUSTOMER_PROFILE_EXISTS`, and
 `uk_customer_email_canonical` returns HTTP 409 `EMAIL_ALREADY_EXISTS`.
@@ -506,8 +517,10 @@ mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,
 
 The integration test creates a temporary PostgreSQL container, applies the
 real migration, enables creation only in its test context, and checks a 201,
-both 409 cases, unchanged stored data, operator rejection, and absence of the
-tested identity values from the application output. JWT decoding is mocked:
+both 409 cases, unchanged stored data, operator rejection, the persisted
+response and seven-day expiry, and rollback of both inserts after a simulated
+failure. It also checks absence of the tested identity values from application
+output. JWT decoding is mocked:
 this test does not validate Keycloak or Gateway integration. It requires a
 working Docker daemon and may need to download the test images.
 

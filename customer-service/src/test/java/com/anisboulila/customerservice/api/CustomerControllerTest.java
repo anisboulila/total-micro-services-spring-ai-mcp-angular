@@ -1,11 +1,10 @@
 package com.anisboulila.customerservice.api;
 
-import com.anisboulila.customerservice.domain.Customer;
 import com.anisboulila.customerservice.error.CorrelationIdFilter;
 import com.anisboulila.customerservice.error.RestProblemExceptionHandler;
 import com.anisboulila.customerservice.security.CustomerSecurityConfiguration;
 import com.anisboulila.customerservice.security.SecurityProblemWriter;
-import com.anisboulila.customerservice.service.CustomerApplicationService;
+import com.anisboulila.customerservice.service.CustomerIdempotencyService;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,7 +18,6 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.Instant;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +41,7 @@ class CustomerControllerTest {
     private JwtDecoder jwtDecoder;
 
     @MockitoBean
-    private CustomerApplicationService customerService;
+    private CustomerIdempotencyService customerService;
 
     @BeforeEach
     void setUp() {
@@ -53,18 +51,16 @@ class CustomerControllerTest {
     @Test
     void createsProfileFromVerifiedIdentityAndReturnsLocation() throws Exception {
         UUID id = UUID.fromString("1346a219-911a-44ea-8750-005cb36eef2f");
-        Customer customer = mock(Customer.class);
-        when(customer.getId()).thenReturn(id);
-        when(customer.getName()).thenReturn("Ada");
-        when(customer.getEmail()).thenReturn("ada@example.test");
-        when(customer.getCreatedAt()).thenReturn(Instant.parse("2026-01-01T00:00:00Z"));
-        when(customerService.createFromVerifiedIdentity("verified-sub", "Ada", "ADA@example.test"))
-                .thenReturn(customer);
+        String body = "{\"id\":\"" + id + "\",\"name\":\"Ada\",\"email\":\"ada@example.test\","
+                + "\"createdAt\":\"2026-01-01T00:00:00Z\"}";
+        when(customerService.create("verified-sub", "Ada", "ADA@example.test", "key-1"))
+                .thenReturn(new CustomerIdempotencyService.CreationResult(body, "/api/v1/customers/" + id));
 
         mockMvc.perform(post("/api/v1/customers")
                         .header("Authorization", "Bearer customer-token")
                         .header("X-User-Id", "forged-sub")
                         .header("X-Roles", "OPERATOR")
+                        .header("Idempotency-Key", "key-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"  Ada  \"}"))
                 .andExpect(status().isCreated())
@@ -74,7 +70,7 @@ class CustomerControllerTest {
                 .andExpect(jsonPath("$.email").value("ada@example.test"))
                 .andExpect(jsonPath("$.createdAt").value("2026-01-01T00:00:00Z"))
                 .andExpect(jsonPath("$.sub").doesNotExist());
-        verify(customerService).createFromVerifiedIdentity("verified-sub", "Ada", "ADA@example.test");
+        verify(customerService).create("verified-sub", "Ada", "ADA@example.test", "key-1");
     }
 
     @Test
@@ -130,6 +126,7 @@ class CustomerControllerTest {
         when(jwtDecoder.decode("unverified-token")).thenReturn(jwt(List.of("CUSTOMER"), false));
         mockMvc.perform(post("/api/v1/customers")
                         .header("Authorization", "Bearer unverified-token")
+                        .header("Idempotency-Key", "key-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Ada\"}"))
                 .andExpect(status().isBadRequest())
@@ -150,10 +147,11 @@ class CustomerControllerTest {
             ConstraintViolationException cause =
                     new ConstraintViolationException("database failure", sql, testCase[0]);
             doThrow(new DataIntegrityViolationException("secret database details", cause))
-                    .when(customerService).createFromVerifiedIdentity("verified-sub", "Ada", "ADA@example.test");
+                    .when(customerService).create("verified-sub", "Ada", "ADA@example.test", "key-1");
 
             mockMvc.perform(post("/api/v1/customers")
                             .header("Authorization", "Bearer customer-token")
+                            .header("Idempotency-Key", "key-1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"name\":\"Ada\"}"))
                     .andExpect(status().is(Integer.parseInt(testCase[2])))
@@ -163,6 +161,40 @@ class CustomerControllerTest {
                     .andExpect(content().string(not(containsString("secret"))))
                     .andExpect(content().string(not(containsString(testCase[0]))));
         }
+
+    }
+
+    @Test
+    void rejectsMissingBlankAndOversizedKeysWithoutSaving() throws Exception {
+        for (String key : List.of("", "   ", "x".repeat(256))) {
+            mockMvc.perform(post("/api/v1/customers")
+                            .header("Authorization", "Bearer customer-token")
+                            .header("Idempotency-Key", key)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"Ada\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_IDEMPOTENCY_KEY"));
+        }
+        mockMvc.perform(post("/api/v1/customers")
+                        .header("Authorization", "Bearer customer-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Ada\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_IDEMPOTENCY_KEY"));
+        verifyNoInteractions(customerService);
+    }
+
+    @Test
+    void acceptsKeyOfExactly255Characters() throws Exception {
+        String key = "x".repeat(255);
+        when(customerService.create("verified-sub", "Ada", "ADA@example.test", key))
+                .thenReturn(new CustomerIdempotencyService.CreationResult("{}", "/api/v1/customers/1"));
+        mockMvc.perform(post("/api/v1/customers")
+                        .header("Authorization", "Bearer customer-token")
+                        .header("Idempotency-Key", key)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Ada\"}"))
+                .andExpect(status().isCreated());
     }
 
     private static Jwt jwt(List<String> roles, boolean emailVerified) {

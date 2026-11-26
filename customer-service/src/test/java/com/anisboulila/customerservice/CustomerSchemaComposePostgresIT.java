@@ -35,7 +35,7 @@ class CustomerSchemaComposePostgresIT {
     @Test
     void appliesCustomerMigrationAndCreatesExpectedColumnsAndIndexes() {
         assertNotNull(flyway.info().current());
-        assertEquals("1", flyway.info().current().getVersion().getVersion());
+        assertEquals("2", flyway.info().current().getVersion().getVersion());
 
         Integer historyRows = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM cps_customer_schema.flyway_schema_history "

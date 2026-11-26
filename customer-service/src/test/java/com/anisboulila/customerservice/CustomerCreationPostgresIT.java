@@ -1,5 +1,6 @@
 package com.anisboulila.customerservice;
 
+import com.anisboulila.customerservice.service.CustomerIdempotencyRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,11 +10,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -21,10 +24,15 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 import java.util.Map;
+import java.time.Duration;
+import java.sql.Timestamp;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.ArgumentMatchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -58,6 +66,9 @@ class CustomerCreationPostgresIT {
     @MockitoBean
     private JwtDecoder jwtDecoder;
 
+    @MockitoSpyBean
+    private CustomerIdempotencyRepository idempotencyRepository;
+
     @BeforeEach
     void setUp() {
         // Cette suppression concerne exclusivement le conteneur PostgreSQL créé pour ce test.
@@ -72,6 +83,7 @@ class CustomerCreationPostgresIT {
     void createsProfileAndRejectsBothDuplicateIdentitiesWithoutChangingIt(CapturedOutput output) throws Exception {
         var created = mockMvc.perform(post("/api/v1/customers")
                         .header("Authorization", "Bearer first")
+                        .header("Idempotency-Key", "test-key")
                         .contentType("application/json")
                         .content("{\"name\":\"Ada\"}"))
                 .andExpect(status().isCreated())
@@ -83,6 +95,19 @@ class CustomerCreationPostgresIT {
         Map<String, Object> initial = jdbcTemplate.queryForMap(
                 "SELECT id, sub, name, email, created_at FROM cps_customer_schema.customer WHERE sub = ?", "subject-one");
         assertEquals("/api/v1/customers/" + initial.get("id"), created.getResponse().getHeader("Location"));
+        Map<String, Object> saved = jdbcTemplate.queryForMap(
+                "SELECT * FROM cps_customer_schema.customer_idempotency WHERE actor_sub = ?", "subject-one");
+        assertEquals("POST /api/v1/customers", saved.get("operation"));
+        assertEquals("test-key", saved.get("idempotency_key"));
+        assertEquals(initial.get("id"), saved.get("customer_id"));
+        assertEquals(201, saved.get("response_status"));
+        assertEquals(created.getResponse().getContentAsString(), saved.get("response_body"));
+        assertEquals(created.getResponse().getHeader("Location"), saved.get("response_location"));
+        assertEquals("aadee19662427801d7ae14c2159c77787c4b410dfe34ae00724c2c4cfe279441",
+                saved.get("request_hash"));
+        assertEquals(Duration.ofDays(7), Duration.between(
+                ((Timestamp) saved.get("created_at")).toInstant(),
+                ((Timestamp) saved.get("expires_at")).toInstant()));
 
         assertConflict("same-sub", "CUSTOMER_PROFILE_EXISTS");
         assertUnchanged(initial);
@@ -103,9 +128,56 @@ class CustomerCreationPostgresIT {
         assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM cps_customer_schema.customer", Integer.class));
     }
 
+    @Test
+    void rollsBackCustomerAndIdempotencyRecordWhenFailureOccursAfterBothInserts() throws Exception {
+        doAnswer(invocation -> {
+            invocation.callRealMethod();
+            throw new IllegalStateException("simulated failure after idempotency insert");
+        }).when(idempotencyRepository).save(anyString(), anyString(), anyString(), anyString(),
+                any(), anyInt(), anyString(), anyString(), any(), any());
+
+        mockMvc.perform(post("/api/v1/customers")
+                        .header("Authorization", "Bearer first")
+                        .header("Idempotency-Key", "rollback-key")
+                        .contentType("application/json")
+                        .content("{\"name\":\"Ada\"}"))
+                .andExpect(status().isInternalServerError());
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cps_customer_schema.customer", Integer.class));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cps_customer_schema.customer_idempotency", Integer.class));
+    }
+
+    @Test
+    void uniqueKeyIsScopedToActorAndOperation() throws Exception {
+        mockMvc.perform(post("/api/v1/customers")
+                        .header("Authorization", "Bearer first")
+                        .header("Idempotency-Key", "shared-key")
+                        .contentType("application/json")
+                        .content("{\"name\":\"Ada\"}"))
+                .andExpect(status().isCreated());
+
+        String copy = """
+                INSERT INTO cps_customer_schema.customer_idempotency
+                    (actor_sub, operation, idempotency_key, request_hash, customer_id,
+                     response_status, response_body, response_location, created_at, expires_at)
+                SELECT ?, ?, idempotency_key, request_hash, customer_id, response_status,
+                       response_body, response_location, created_at, expires_at
+                  FROM cps_customer_schema.customer_idempotency
+                 WHERE actor_sub = 'subject-one' AND operation = 'POST /api/v1/customers'
+                """;
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbcTemplate.update(copy, "subject-one", "POST /api/v1/customers"));
+        assertEquals(1, jdbcTemplate.update(copy, "subject-two", "POST /api/v1/customers"));
+        assertEquals(1, jdbcTemplate.update(copy, "subject-one", "POST /another-operation"));
+        assertEquals(3, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cps_customer_schema.customer_idempotency", Integer.class));
+    }
+
     private void assertConflict(String token, String code) throws Exception {
         mockMvc.perform(post("/api/v1/customers")
                         .header("Authorization", "Bearer " + token)
+                        .header("Idempotency-Key", "other-key")
                         .contentType("application/json")
                         .content("{\"name\":\"Grace\"}"))
                 .andExpect(status().isConflict())
