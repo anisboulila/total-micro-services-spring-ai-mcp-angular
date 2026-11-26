@@ -2,10 +2,12 @@ package com.anisboulila.customerservice.service;
 
 import com.anisboulila.customerservice.api.CustomerResponse;
 import com.anisboulila.customerservice.domain.Customer;
+import com.anisboulila.customerservice.error.ApiProblemException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -39,14 +41,29 @@ public class CustomerIdempotencyService {
         // L'empreinte utilise les valeurs effectives, jamais le token ou la clé.
         String hash = fingerprint(new CanonicalRequest(OPERATION, sub, name,
                 email.strip().toLowerCase(Locale.ROOT)));
+        var stored = idempotency.findForUpdate(sub, OPERATION, key);
+        Instant now = clock.instant();
+        if (stored.isPresent()) {
+            var previous = stored.get();
+            if (previous.expiresAt().isAfter(now)) {
+                if (!previous.hash().equals(hash)) {
+                    throw new ApiProblemException(HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_REUSED",
+                            "Idempotency key reused", "The idempotency key was already used for a different request.");
+                }
+                // Rejouer le résultat enregistré sans refaire l'insertion du profil.
+                return new CreationResult(previous.status(), previous.body(), previous.location());
+            }
+            // La suppression et une éventuelle nouvelle création sont dans la même transaction.
+            idempotency.delete(sub, OPERATION, key);
+        }
         Customer customer = customers.createFromVerifiedIdentity(sub, name, email);
         String body = serialize(CustomerResponse.from(customer));
         String location = "/api/v1/customers/" + customer.getId();
-        Instant now = clock.instant();
+        now = clock.instant();
         // Les deux écritures partagent la transaction : un échec annule aussi le profil.
         idempotency.save(sub, OPERATION, key, hash, customer.getId(), 201, body, location,
                 now, now.plus(Duration.ofDays(7)));
-        return new CreationResult(body, location);
+        return new CreationResult(201, body, location);
     }
 
     private String fingerprint(CanonicalRequest request) {
@@ -70,6 +87,6 @@ public class CustomerIdempotencyService {
     private record CanonicalRequest(String operation, String sub, String name, String email) {
     }
 
-    public record CreationResult(String body, String location) {
+    public record CreationResult(int status, String body, String location) {
     }
 }

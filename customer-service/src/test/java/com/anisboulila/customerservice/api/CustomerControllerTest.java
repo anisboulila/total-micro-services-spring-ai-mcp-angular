@@ -54,7 +54,7 @@ class CustomerControllerTest {
         String body = "{\"id\":\"" + id + "\",\"name\":\"Ada\",\"email\":\"ada@example.test\","
                 + "\"createdAt\":\"2026-01-01T00:00:00Z\"}";
         when(customerService.create("verified-sub", "Ada", "ADA@example.test", "key-1"))
-                .thenReturn(new CustomerIdempotencyService.CreationResult(body, "/api/v1/customers/" + id));
+                .thenReturn(new CustomerIdempotencyService.CreationResult(201, body, "/api/v1/customers/" + id));
 
         mockMvc.perform(post("/api/v1/customers")
                         .header("Authorization", "Bearer customer-token")
@@ -188,7 +188,7 @@ class CustomerControllerTest {
     void acceptsKeyOfExactly255Characters() throws Exception {
         String key = "x".repeat(255);
         when(customerService.create("verified-sub", "Ada", "ADA@example.test", key))
-                .thenReturn(new CustomerIdempotencyService.CreationResult("{}", "/api/v1/customers/1"));
+                .thenReturn(new CustomerIdempotencyService.CreationResult(201, "{}", "/api/v1/customers/1"));
         mockMvc.perform(post("/api/v1/customers")
                         .header("Authorization", "Bearer customer-token")
                         .header("Idempotency-Key", key)

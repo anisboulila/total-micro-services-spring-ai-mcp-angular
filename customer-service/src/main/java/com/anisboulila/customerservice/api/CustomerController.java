@@ -37,7 +37,7 @@ public class CustomerController {
     public ResponseEntity<String> create(@AuthenticationPrincipal Jwt jwt,
                                          @Valid @RequestBody CreateCustomerRequest request,
                                          @RequestHeader(value = "Idempotency-Key", required = false) String key) {
-        // Garde temporaire : les doublons et l'idempotence ne sont pas encore implémentés.
+        // Garde temporaire : l'idempotence concurrente n'est pas encore validée.
         if (!creationEnabled) {
             throw new ApiProblemException(HttpStatus.SERVICE_UNAVAILABLE, "PROFILE_CREATION_DISABLED",
                     "Profile creation unavailable", "Profile creation is not enabled.");
@@ -51,7 +51,7 @@ public class CustomerController {
         CustomerIdentityValidator.VerifiedIdentity identity = identityValidator.validate(jwt);
         CustomerIdempotencyService.CreationResult result =
                 customerService.create(identity.sub(), request.name(), identity.email(), key);
-        return ResponseEntity.created(URI.create(result.location()))
+        return ResponseEntity.status(result.status()).location(URI.create(result.location()))
                 .contentType(MediaType.APPLICATION_JSON).body(result.body());
     }
 }

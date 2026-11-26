@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -32,5 +33,24 @@ public class CustomerIdempotencyRepository {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """.formatted(table), sub, operation, key, hash, customerId, status, body, location,
                 Timestamp.from(createdAt), Timestamp.from(expiresAt));
+    }
+
+    public Optional<StoredResult> findForUpdate(String sub, String operation, String key) {
+        return jdbcTemplate.query("""
+                SELECT request_hash, response_status, response_body, response_location, expires_at
+                FROM %s WHERE actor_sub = ? AND operation = ? AND idempotency_key = ?
+                FOR UPDATE
+                """.formatted(table), (rs, row) -> new StoredResult(
+                rs.getString("request_hash"), rs.getInt("response_status"),
+                rs.getString("response_body"), rs.getString("response_location"),
+                rs.getTimestamp("expires_at").toInstant()), sub, operation, key).stream().findFirst();
+    }
+
+    public void delete(String sub, String operation, String key) {
+        jdbcTemplate.update("DELETE FROM " + table
+                + " WHERE actor_sub = ? AND operation = ? AND idempotency_key = ?", sub, operation, key);
+    }
+
+    public record StoredResult(String hash, int status, String body, String location, Instant expiresAt) {
     }
 }

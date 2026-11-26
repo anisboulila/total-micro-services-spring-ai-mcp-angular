@@ -25,6 +25,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.util.List;
 import java.util.Map;
 import java.time.Duration;
+import java.time.Clock;
+import java.time.Instant;
 import java.sql.Timestamp;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -47,6 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class CustomerCreationPostgresIT {
 
+    private static final Instant START = Instant.parse("2026-01-01T00:00:00Z");
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17-alpine");
 
@@ -66,6 +69,9 @@ class CustomerCreationPostgresIT {
     @MockitoBean
     private JwtDecoder jwtDecoder;
 
+    @MockitoBean
+    private Clock clock;
+
     @MockitoSpyBean
     private CustomerIdempotencyRepository idempotencyRepository;
 
@@ -73,10 +79,12 @@ class CustomerCreationPostgresIT {
     void setUp() {
         // Cette suppression concerne exclusivement le conteneur PostgreSQL créé pour ce test.
         jdbcTemplate.update("DELETE FROM cps_customer_schema.customer");
+        when(clock.instant()).thenReturn(START);
         when(jwtDecoder.decode("first")).thenReturn(jwt("subject-one", "ada@example.test", "CUSTOMER"));
         when(jwtDecoder.decode("same-sub")).thenReturn(jwt("subject-one", "other@example.test", "CUSTOMER"));
         when(jwtDecoder.decode("same-email")).thenReturn(jwt("subject-two", " ADA@EXAMPLE.TEST ", "CUSTOMER"));
         when(jwtDecoder.decode("operator")).thenReturn(jwt("operator", "operator@example.test", "OPERATOR"));
+        when(jwtDecoder.decode("second")).thenReturn(jwt("subject-two", "grace@example.test", "CUSTOMER"));
     }
 
     @Test
@@ -172,6 +180,85 @@ class CustomerCreationPostgresIT {
         assertEquals(1, jdbcTemplate.update(copy, "subject-one", "POST /another-operation"));
         assertEquals(3, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM cps_customer_schema.customer_idempotency", Integer.class));
+    }
+
+    @Test
+    void replaysExactResponseRejectsDifferentContentAndScopesKeyByActor() throws Exception {
+        var first = create("first", "shared-key", "{\"name\":\"Ada\"}")
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        var replay = create("first", "shared-key", "{ \"name\" : \"  Ada  \" }")
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        assertEquals(first.getStatus(), replay.getStatus());
+        assertEquals(first.getContentAsString(), replay.getContentAsString());
+        assertEquals(first.getHeader("Location"), replay.getHeader("Location"));
+        create("first", "shared-key", "{\"name\":\"Grace\"}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED"));
+        create("same-sub", "shared-key", "{\"name\":\"Ada\"}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED"));
+        create("second", "shared-key", "{\"name\":\"Grace\"}")
+                .andExpect(status().isCreated());
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cps_customer_schema.customer", Integer.class));
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cps_customer_schema.customer_idempotency", Integer.class));
+    }
+
+    @Test
+    void expiresExactlyAtSevenDaysWithoutRemovingExistingProfile() throws Exception {
+        var first = create("first", "expiry-key", "{\"name\":\"Ada\"}")
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        when(clock.instant()).thenReturn(START.plus(Duration.ofDays(7)).minusMillis(1));
+        var replay = create("first", "expiry-key", "{\"name\":\"Ada\"}")
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        assertEquals(first.getContentAsString(), replay.getContentAsString());
+
+        when(clock.instant()).thenReturn(START.plus(Duration.ofDays(7)));
+        create("first", "expiry-key", "{\"name\":\"Ada\"}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CUSTOMER_PROFILE_EXISTS"));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cps_customer_schema.customer", Integer.class));
+        // Le conflit annule aussi la suppression de la clé expirée.
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cps_customer_schema.customer_idempotency", Integer.class));
+    }
+
+    @Test
+    void expiredRecordCanBeReplacedWhenNewCreationIsPermitted() throws Exception {
+        create("first", "expiry-key", "{\"name\":\"Ada\"}").andExpect(status().isCreated());
+        // Simuler une ancienne clé pour un acteur qui n'a pas encore de profil.
+        jdbcTemplate.update("UPDATE cps_customer_schema.customer_idempotency SET actor_sub = ? WHERE actor_sub = ?",
+                "subject-two", "subject-one");
+        when(clock.instant()).thenReturn(START.plus(Duration.ofDays(7)));
+        create("second", "expiry-key", "{\"name\":\"Grace\"}").andExpect(status().isCreated());
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cps_customer_schema.customer", Integer.class));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cps_customer_schema.customer_idempotency", Integer.class));
+        assertEquals(Timestamp.from(START.plus(Duration.ofDays(14))), jdbcTemplate.queryForObject(
+                "SELECT expires_at FROM cps_customer_schema.customer_idempotency WHERE actor_sub = ?",
+                Timestamp.class, "subject-two"));
+    }
+
+    @Test
+    void rejectedValidationDoesNotConsumeKey() throws Exception {
+        create("first", "retry-key", "{\"name\":\" \"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cps_customer_schema.customer_idempotency", Integer.class));
+        create("first", "retry-key", "{\"name\":\"Ada\"}").andExpect(status().isCreated());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions create(String token, String key, String body)
+            throws Exception {
+        return mockMvc.perform(post("/api/v1/customers")
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", key)
+                .contentType("application/json")
+                .content(body));
     }
 
     private void assertConflict(String token, String code) throws Exception {

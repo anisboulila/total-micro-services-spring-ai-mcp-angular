@@ -410,6 +410,7 @@
 - **Commandes :** `mvn -pl customer-service "-Dtest=*Idempotency*Test" test`.
 - **Vérification / acceptation :** même clé/contenu rejoue statut/corps; autre contenu 409; absent/vide/>255 = 400; expiration autorise nouvelle commande.
 - **Erreurs / diagnostic :** vérifier empreinte insensible à l’ordre JSON mais sensible aux valeurs fonctionnelles.
+- **Preuve automatisée :** `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,CustomerCreationDisabledTest,CustomerApplicationServiceTest" "-Dit.test=CustomerCreationPostgresIT" verify` a retourné `BUILD SUCCESS` : 12 tests ciblés et 8 tests PostgreSQL isolés. Le test vérifie le rejeu séquentiel exact, le conflit de contenu, la portée par acteur, la frontière des sept jours et le rollback d'une suppression expirée en cas de conflit. Le JWT est simulé ; les premières requêtes concurrentes restent à traiter en 6.3.
 - **Point d’arrêt :** attendre résultats séquentiels avant concurrence.
 
 - [ ] 6.3 **CPS-IDEM-03** — Tester les requêtes concurrentes

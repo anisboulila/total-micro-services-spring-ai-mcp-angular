@@ -486,7 +486,7 @@ present. Profile creation is disabled by default: authenticated, authorized
 requests with valid input receive HTTP 503 `PROFILE_CREATION_DISABLED` until
 the feature is enabled. The test property `customer.profile-creation.enabled`
 explicitly enables it in isolated tests only. Do not enable it for normal use:
-idempotent retries and the remaining concurrency work are not yet implemented.
+concurrent idempotent retries are not yet implemented or verified.
 The response `Location` identifies the new profile, but its GET endpoint is
 not yet implemented.
 
@@ -496,8 +496,12 @@ Its unique key is scoped to the verified subject and operation in this service's
 database, and its expiration is seven days after creation. The exact JSON
 response, status and Location are stored; bearer tokens are not. An enabled
 test request must include a non-blank `Idempotency-Key` of at most 255
-characters. **Replaying stored responses, expiration handling and concurrent
-requests are not implemented yet**; keeping the creation flag off is essential.
+characters. Sequential retries replay the saved response for an identical
+effective request, or return 409 `IDEMPOTENCY_KEY_REUSED` for different
+content. An expired key may be reused, but the existing Customer uniqueness
+constraints still apply. If the new creation fails, the expired record's
+removal rolls back. **Concurrent first requests are not coordinated yet**;
+keeping the creation flag off is essential until that work is complete.
 The V2 migration creates a new table when Flyway next starts the updated service,
 including on an existing database; it does not delete existing profiles.
 
@@ -518,8 +522,9 @@ mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,
 The integration test creates a temporary PostgreSQL container, applies the
 real migration, enables creation only in its test context, and checks a 201,
 both 409 cases, unchanged stored data, operator rejection, the persisted
-response and seven-day expiry, and rollback of both inserts after a simulated
-failure. It also checks absence of the tested identity values from application
+response, sequential replay and conflict, actor scope, the seven-day expiry
+boundary, and rollback of both inserts after a simulated failure. It also
+checks absence of the tested identity values from application
 output. JWT decoding is mocked:
 this test does not validate Keycloak or Gateway integration. It requires a
 working Docker daemon and may need to download the test images.
