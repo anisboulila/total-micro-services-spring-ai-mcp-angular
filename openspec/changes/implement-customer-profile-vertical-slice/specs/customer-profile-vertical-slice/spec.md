@@ -96,6 +96,7 @@ The Customer slice MUST provide repeatable automated tests for its migrations, R
 #### Scenario: Idempotent profile creation under replay and concurrency
 - **GIVEN** multiple identical or conflicting create requests using an idempotency key
 - **WHEN** the test suite submits them sequentially and concurrently
-- **THEN** identical requests replay the original success status/body within seven days
+- **THEN** identical requests replay the original success status/body before the recorded expiration
+- **AND** expiration is seven days after the UTC timestamp recorded immediately before the idempotency result is inserted
 - **AND** only one profile is created
 - **AND** a different effective request returns HTTP 409 with `IDEMPOTENCY_KEY_REUSED`

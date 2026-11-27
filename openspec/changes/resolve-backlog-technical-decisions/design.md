@@ -164,8 +164,12 @@ de `OPERATOR` interdit la création, même en présence du rôle `CUSTOMER`.
 
 ### TD-05 — Idempotence persistante
 
-**DÉCIDÉ :** la durée de conservation est de sept jours à compter du commit de
-succès; l’unicité est garantie par la base PostgreSQL du service propriétaire;
+**DÉCIDÉ :** l'expiration est fixée à sept jours après l'instant UTC enregistré
+immédiatement avant l'insertion du résultat d'idempotence, dans la transaction
+de création. Elle n'est donc pas garantie sept jours après le commit : la
+durée entre cet instant et le commit réduit d'autant la période après commit.
+Cette décision remplace le point de départ précédent au commit de succès.
+L’unicité est garantie par la base PostgreSQL du service propriétaire;
 l’enregistrement de création et la ressource sont atomiques; même contenu
 rejoue le résultat initial; contenu différent avec la même clé retourne HTTP
 409; les clés sont distinctes par acteur et opération.

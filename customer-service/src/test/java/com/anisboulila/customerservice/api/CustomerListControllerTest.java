@@ -15,6 +15,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -136,6 +137,27 @@ class CustomerListControllerTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/v1/customers/not-a-uuid").header("Authorization", "Bearer customer"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void detailMapsCustomerToExactPublicResponse() throws Exception {
+        UUID id = UUID.fromString("12345678-1234-1234-1234-123456789012");
+        Customer customer = spy(Customer.create("subject-one", "Alice", "alice@example.test",
+                Instant.parse("2026-01-01T12:34:56Z")));
+        doReturn(id).when(customer).getId();
+        when(customers.findReadable(id, "subject-one", false)).thenReturn(Optional.of(customer));
+
+        mockMvc.perform(get("/api/v1/customers/{id}", id).header("Authorization", "Bearer customer"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("""
+                        {
+                          "id": "12345678-1234-1234-1234-123456789012",
+                          "name": "Alice",
+                          "email": "alice@example.test",
+                          "createdAt": "2026-01-01T12:34:56Z"
+                        }
+                        """, JsonCompareMode.STRICT))
+                .andExpect(jsonPath("$.sub").doesNotExist());
     }
 
     private static Jwt jwt(String sub, List<String> roles) {

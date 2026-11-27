@@ -1,0 +1,82 @@
+{
+  "realm": "customer-integration-test",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      { "name": "CUSTOMER" },
+      { "name": "OPERATOR" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "customer-test-client",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": false,
+      "defaultClientScopes": ["basic", "profile", "email", "roles"],
+      "protocolMappers": [
+        {
+          "name": "customer-service-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "customer-service",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "wrong-audience-client",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": false,
+      "defaultClientScopes": ["basic", "profile", "email", "roles"]
+    }
+  ],
+  "users": [
+    {
+      "username": "alice-test",
+      "firstName": "Alice",
+      "lastName": "Test",
+      "enabled": true,
+      "email": "alice@example.test",
+      "emailVerified": true,
+      "realmRoles": ["CUSTOMER"],
+      "credentials": [{ "type": "password", "value": "test-only", "temporary": false }]
+    },
+    {
+      "username": "bob-test",
+      "firstName": "Bob",
+      "lastName": "Test",
+      "enabled": true,
+      "email": "bob@example.test",
+      "emailVerified": true,
+      "realmRoles": ["CUSTOMER"],
+      "credentials": [{ "type": "password", "value": "test-only", "temporary": false }]
+    },
+    {
+      "username": "operator-test",
+      "firstName": "Operator",
+      "lastName": "Test",
+      "enabled": true,
+      "email": "operator@example.test",
+      "emailVerified": true,
+      "realmRoles": ["OPERATOR"],
+      "credentials": [{ "type": "password", "value": "test-only", "temporary": false }]
+    },
+    {
+      "username": "dual-test",
+      "firstName": "Dual",
+      "lastName": "Test",
+      "enabled": true,
+      "email": "dual@example.test",
+      "emailVerified": true,
+      "realmRoles": ["CUSTOMER", "OPERATOR"],
+      "credentials": [{ "type": "password", "value": "test-only", "temporary": false }]
+    }
+  ]
+}

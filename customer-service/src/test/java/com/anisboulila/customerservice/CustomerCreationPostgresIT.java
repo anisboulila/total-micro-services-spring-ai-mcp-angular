@@ -103,6 +103,17 @@ class CustomerCreationPostgresIT {
     }
 
     @Test
+    void appliesBothCustomerMigrationsToFreshDatabase() {
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cps_customer_schema.flyway_schema_history "
+                        + "WHERE version IN ('1', '2') AND success = TRUE", Integer.class));
+        assertTrue(jdbcTemplate.queryForObject(
+                "SELECT to_regclass('cps_customer_schema.customer') IS NOT NULL", Boolean.class));
+        assertTrue(jdbcTemplate.queryForObject(
+                "SELECT to_regclass('cps_customer_schema.customer_idempotency') IS NOT NULL", Boolean.class));
+    }
+
+    @Test
     void createsProfileAndRejectsBothDuplicateIdentitiesWithoutChangingIt(CapturedOutput output) throws Exception {
         var created = mockMvc.perform(post("/api/v1/customers")
                         .header("Authorization", "Bearer first")

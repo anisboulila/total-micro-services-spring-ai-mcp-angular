@@ -111,10 +111,11 @@ The Customer and Account creation APIs MUST enforce the owner-approved actor-and
 - **GIVEN** un POST de création valide avec une clé d’idempotence inutilisée dans le périmètre `(actor_sub, operation, service)`
 - **WHEN** le service traite la requête
 - **THEN** il persiste la ressource et le statut/corps rejouable de manière atomique dans sa base PostgreSQL
-- **AND** il conserve l’enregistrement pendant sept jours à partir du commit de succès
+- **AND** l'expiration UTC est fixée à sept jours après l'instant enregistré immédiatement avant l'insertion du résultat d'idempotence dans la transaction
+- **AND** la période après le commit peut être inférieure à sept jours
 
 #### Scenario: Rejeu identique
-- **GIVEN** une création réussie et une nouvelle requête de même acteur, opération, clé et contenu effectif dans les sept jours
+- **GIVEN** une création réussie et une nouvelle requête de même acteur, opération, clé et contenu effectif avant l'expiration enregistrée
 - **WHEN** le service traite le rejeu
 - **THEN** il retourne le statut et le corps initiaux sans créer une seconde ressource
 

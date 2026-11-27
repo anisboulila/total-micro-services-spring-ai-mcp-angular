@@ -66,7 +66,8 @@ fonctionnalité.
 - Idempotence de `POST` selon la spécification technique : clé requise,
   portée acteur/opération/base du service, empreinte SHA-256 canonique, succès
   persisté atomiquement avec la ressource, rejeu exact, concurrence sans
-  doublon et expiration après sept jours. Ce mécanisme s’applique à la
+  doublon et expiration sept jours après l'instant UTC relevé juste avant
+  l'insertion du résultat, et non nécessairement sept jours après commit. Ce mécanisme s’applique à la
   création de profil; les clés ne contiennent ni ne journalisent de secrets.
 - Tests JUnit 5/Spring Boot Test et MockMvc, PostgreSQL et Keycloak avec
   Testcontainers; migrations, validations, autorisations, pagination,

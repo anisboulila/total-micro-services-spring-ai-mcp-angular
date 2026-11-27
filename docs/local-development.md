@@ -513,7 +513,7 @@ request fingerprint together with the Customer in one database transaction.
 Its unique key is scoped to the verified subject and operation in this service's
 database, and its expiration is seven days after the timestamp recorded just
 before the response is inserted, not necessarily seven days after commit.
-This is a known gap relative to TD-05's seven days after commit. The exact JSON
+TD-05 explicitly accepts this reference point. The exact JSON
 response, status and Location are stored; bearer tokens are not. An enabled
 test request must include a non-blank `Idempotency-Key` of at most 255
 characters. Sequential retries replay the saved response for an identical
@@ -558,6 +558,25 @@ application instances. The suite also checks absence of the tested identity
 values from application output. JWT decoding is mocked: this test does not
 validate Keycloak or Gateway integration. It requires a working Docker daemon
 and may need to download the test images.
+
+For the full isolated Customer integration suite, including a real Keycloak:
+
+```powershell
+docker info
+mvn -pl customer-service -Pintegration-tests verify
+```
+
+The profile runs the regular `*Test` suite and the explicitly selected Failsafe
+integration tests. It starts temporary PostgreSQL 17 and Keycloak 26.8.1
+containers, verifies the real Customer migrations on a fresh database and an
+upgrade from V1 to V2, and exercises uniqueness, pagination and idempotence.
+The Keycloak test obtains signed tokens from a disposable test-only realm and
+uses the real Customer JWT decoder, including issuer, JWKS and audience checks.
+The test realm enables direct grants solely for automated token acquisition;
+this does not change the local development realm or its PKCE configuration.
+Test accounts and their passwords are fictitious and have no access to the
+development environment. Testcontainers requires Docker and may download
+images. This suite does not exercise Gateway or a multi-instance deployment.
 
 `customer-service` validates bearer access tokens itself; access through the
 Gateway does not replace this check. Its local issuer is

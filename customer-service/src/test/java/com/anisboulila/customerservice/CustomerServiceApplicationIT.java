@@ -79,6 +79,32 @@ class CustomerServiceApplicationIT {
                 });
     }
 
+    @Test
+    void customerMigrationsUpgradeFromVersionOneWithoutLosingData() {
+        String schema = "cps_customer_upgrade";
+        Flyway initial = Flyway.configure()
+                .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                .schemas(schema).defaultSchema(schema).locations("classpath:db/migration")
+                .target("1").load();
+        initial.migrate();
+        assertEquals("1", initial.info().current().getVersion().getVersion());
+        jdbcTemplate.update("INSERT INTO cps_customer_upgrade.customer (sub, name, email, created_at) "
+                        + "VALUES (?, ?, ?, CURRENT_TIMESTAMP)", "upgrade-sub", "Upgrade", "upgrade@example.test");
+
+        Flyway updated = Flyway.configure()
+                .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                .schemas(schema).defaultSchema(schema).locations("classpath:db/migration").load();
+        updated.migrate();
+        updated.validate();
+        assertEquals("2", updated.info().current().getVersion().getVersion());
+        assertEquals(2, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM cps_customer_upgrade.flyway_schema_history "
+                + "WHERE version IN ('1', '2') AND success = TRUE", Integer.class));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cps_customer_upgrade.customer WHERE sub = 'upgrade-sub'", Integer.class));
+        assertNotNull(jdbcTemplate.queryForObject(
+                "SELECT to_regclass('cps_customer_upgrade.customer_idempotency')", String.class));
+    }
+
     private static boolean hasCause(Throwable failure, Class<? extends Throwable> type) {
         for (Throwable current = failure; current != null; current = current.getCause()) {
             if (type.isInstance(current)) {

@@ -386,7 +386,7 @@
 
 ## 6. Idempotence et concurrence
 
-- [ ] 6.1 **CPS-IDEM-01** — Persister le résultat idempotent
+- [x] 6.1 **CPS-IDEM-01** — Persister le résultat idempotent
 
 - **Objectif / résultat :** enregistrer clé et réponse de succès dans la transaction Customer.
 - **Dépendances :** CPS-API-03, CPS-DB-02.
@@ -394,10 +394,10 @@
 - **Apprenant :** vérifie migration et test de rollback.
 - **Fichiers Copilot :** migration idempotence, modèle/service et tests transactionnels.
 - **Commandes :** `mvn -pl customer-service -am verify`.
-- **Vérification / acceptation :** portée acteur/opération/service; réponse HTTP/corps stockés avec la ressource; expiration UTC de 7 jours; aucun token persisté/loggé.
+- **Vérification / acceptation :** portée acteur/opération/service; réponse HTTP/corps stockés avec la ressource; expiration UTC sept jours après l'instant relevé juste avant l'insertion du résultat; aucun token persisté/loggé.
 - **Erreurs / diagnostic :** ressource sans clé ou clé sans ressource révèle transaction non atomique.
 - **Preuve automatisée :** `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,CustomerCreationDisabledTest,CustomerApplicationServiceTest" "-Dit.test=CustomerCreationPostgresIT" verify` a retourné `BUILD SUCCESS` : 11 tests ciblés et 4 tests PostgreSQL isolés réussis. Les tests vérifient la réponse stockée, l'empreinte, la portée, les sept jours et l'annulation des deux écritures après une erreur simulée. La création reste désactivée par défaut ; rejeu et concurrence restent à implémenter.
-- **Limite bloquante TD-05 :** les sept jours sont calculés avant le commit, et non à partir du commit de succès. Le test mesure sept jours entre les timestamps stockés, sans prouver sept jours après le commit. La tâche reste ouverte jusqu'à résolution ou modification explicite de la décision.
+- **Décision et validation :** l'apprenant accepte que les sept jours commencent juste avant l'insertion du résultat, et non au commit. TD-05 et le contrat sont mis à jour en conséquence ; la période après commit peut être plus courte. Le test vérifie les dates stockées et le rollback atomique. La tâche est clôturée sur cette base.
 
 - [x] 6.2 **CPS-IDEM-02** — Tester rejeu, conflit et expiration
 
@@ -410,7 +410,7 @@
 - **Vérification / acceptation :** même clé/contenu rejoue statut/corps; autre contenu 409; absent/vide/>255 = 400; expiration autorise nouvelle commande.
 - **Erreurs / diagnostic :** vérifier empreinte insensible à l’ordre JSON mais sensible aux valeurs fonctionnelles.
 - **Preuve automatisée :** `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,CustomerCreationDisabledTest,CustomerApplicationServiceTest" "-Dit.test=CustomerCreationPostgresIT" verify` a retourné `BUILD SUCCESS` : 12 tests ciblés et 8 tests PostgreSQL isolés. Le test vérifie le rejeu séquentiel exact, le conflit de contenu, la portée par acteur, la frontière des sept jours et le rollback d'une suppression expirée en cas de conflit. Le JWT est simulé ; les premières requêtes concurrentes restent à traiter en 6.3.
-- **Validation :** rejeu, normalisation, conflit de contenu et limites de clé observés manuellement ; expiration manuelle reportée. Tests séquentiels PostgreSQL réussis, avec horloge contrôlée. La dépendance 6.1 conserve la limite TD-05 ci-dessus.
+- **Validation :** rejeu, normalisation, conflit de contenu et limites de clé observés manuellement ; expiration manuelle reportée. Tests séquentiels PostgreSQL réussis, avec horloge contrôlée. Le point de départ de l'expiration est précisé dans la décision 6.1.
 
 - [x] 6.3 **CPS-IDEM-03** — Tester les requêtes concurrentes
 
@@ -423,8 +423,8 @@
 - **Vérification / acceptation :** N demandes identiques produisent un Customer et toutes reçoivent la réponse initiale, sans 500 parasite.
 - **Erreurs / diagnostic :** tests séquentiels/H2 ne prouvent pas la concurrence; confirmer PostgreSQL Testcontainers et synchronisation effective.
 - **Preuve automatisée :** commande ciblée réussie : 12 tests unitaires/MVC et 13 tests d'intégration PostgreSQL isolé. Les tests observent les verrous en attente dans PostgreSQL et vérifient le rejeu exact de quatre demandes, le conflit de contenu, le rollback du premier traitement, la séparation entre acteurs et le remplacement d'une clé expirée. Ils utilisent plusieurs connexions mais un seul contexte applicatif ; le JWT est simulé, sans test de deux instances ou parcours Gateway/Keycloak. La création reste désactivée par défaut.
-- **Limite existante :** l'expiration est calculée avant le commit, et non exactement sept jours après le commit comme indiqué par TD-05.
-- **Validation :** tests concurrents PostgreSQL automatisés réussis ; validation manuelle et test de deux instances applicatives distinctes reportés. La dépendance 6.1 conserve la limite TD-05 ci-dessus.
+- **Précision TD-05 :** l'expiration est calculée avant l'insertion, et la durée après commit peut être inférieure à sept jours.
+- **Validation :** tests concurrents PostgreSQL automatisés réussis ; validation manuelle et test de deux instances applicatives distinctes reportés.
 
 **Nouvelle vérification automatisée 5.5–6.3 :** le 27 novembre 2026,
 `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,CustomerCreationDisabledTest,CustomerCreationLocalDisabledTest,CustomerApplicationServiceTest" "-Dit.test=CustomerCreationPostgresIT" verify`
@@ -458,7 +458,7 @@ défaut en l'absence de profil explicite.
 - **Preuve automatisée :** `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerListControllerTest,CustomerPaginationConfigurationTest,CustomerControllerTest,CustomerCreationDisabledTest,CustomerCreationLocalDisabledTest,CustomerIdentityValidatorTest,CustomerApplicationServiceTest,CustomerSecurityConfigurationTest" "-Dit.test=CustomerCreationPostgresIT" verify` a retourné `BUILD SUCCESS` : 31 tests ciblés et 14 tests PostgreSQL isolés, sans échec. La lecture filtre par `sub` vérifié et retourne une page vide si aucun profil ; les valeurs de pagination sont configurables et contrôlées. OPERATOR et le double rôle sont temporairement refusés (403) en attendant 7.3. Les JWT sont simulés pour les tests MVC/PostgreSQL.
 - **Preuve manuelle et validation :** l'apprenant a observé via Gateway et Keycloak les profils isolés de deux clients, la liste vide pour un client sans profil, le 403 `FORBIDDEN` pour OPERATOR, le 401 sans token, le 400 `INVALID_PAGE_SIZE` pour `size=101`, la page 1 vide avec totaux inchangés et l'ignorance d'un paramètre `sub` falsifié. L'apprenant valide la tâche sans poursuivre tous les cas manuels ; la page négative et le double rôle n'ont pas été confirmés manuellement.
 
-- [ ] 7.2 **CPS-API-06** — Consulter un Customer par identifiant
+- [x] 7.2 **CPS-API-06** — Consulter un Customer par identifiant
 
 - **Objectif / résultat :** détail propriétaire avec masquage 404.
 - **Dépendances :** CPS-API-05.
@@ -468,10 +468,10 @@ défaut en l'absence de profil explicite.
 - **Commandes :** `mvn -pl customer-service -am test`.
 - **Vérification / acceptation :** client lit le sien; absent et étranger donnent même HTTP 404 et contrat d’erreur.
 - **Erreurs / diagnostic :** comparer status et corps des deux 404; ne pas révéler l’existence.
-- **Preuve automatisée :** tests MVC et PostgreSQL ciblés réussis : lecture propriétaire et opérateur, priorité du double rôle, refus de création pour le double rôle et mêmes erreurs 404 pour identifiant étranger et absent (hors `instance`, propre à l'URL). Les JWT sont simulés ; la validation manuelle via Keycloak et Gateway reste à faire.
-- **Point d’arrêt :** attendre les deux cas vérifiés.
+- **Preuve automatisée :** tests MVC et PostgreSQL ciblés réussis : lecture propriétaire et opérateur, priorité du double rôle, refus de création pour le double rôle et mêmes erreurs 404 pour identifiant étranger et absent (hors `instance`, propre à l'URL). Les JWT sont simulés.
+- **Validation manuelle :** l'apprenant a confirmé le HTTP 200 pour la consultation de son propre profil via Postman et valide la tâche. Les cas étrangers et inexistants n'ont pas été confirmés manuellement ; ils sont couverts par les tests automatisés.
 
-- [ ] 7.3 **CPS-API-07** — Paginer la liste opérateur
+- [x] 7.3 **CPS-API-07** — Paginer la liste opérateur
 
 - **Objectif / résultat :** liste globale OPERATOR triée/paginée selon contrats.
 - **Dépendances :** CPS-API-05, CPS-SEC-01.
@@ -481,10 +481,10 @@ défaut en l'absence de profil explicite.
 - **Commandes :** `mvn -pl customer-service -am test`.
 - **Vérification / acceptation :** OPERATOR voit tous; défaut 20; max 100; ordre `createdAt DESC, id ASC`; invalides HTTP 400.
 - **Erreurs / diagnostic :** vérifier ordre sur timestamps égaux et code `INVALID_PAGE_SIZE`; aucune troncature silencieuse.
-- **Preuve automatisée :** `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerListControllerTest,CustomerPaginationConfigurationTest,CustomerControllerTest,CustomerCreationDisabledTest,CustomerCreationLocalDisabledTest,CustomerIdentityValidatorTest,CustomerApplicationServiceTest,CustomerSecurityConfigurationTest" "-Dit.test=CustomerCreationPostgresIT" verify` : `BUILD SUCCESS`, 35 tests ciblés et 16 tests PostgreSQL isolés, sans échec. La pagination globale, le tri sur timestamps égaux, les limites, le double rôle et un offset supérieur à la limite JPA sont testés. Les JWT sont simulés ; la validation manuelle reste à faire.
-- **Point d’arrêt :** attendre résultats sur limites.
+- **Preuve automatisée :** `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerListControllerTest,CustomerPaginationConfigurationTest,CustomerControllerTest,CustomerCreationDisabledTest,CustomerCreationLocalDisabledTest,CustomerIdentityValidatorTest,CustomerApplicationServiceTest,CustomerSecurityConfigurationTest" "-Dit.test=CustomerCreationPostgresIT" verify` : `BUILD SUCCESS`, 35 tests ciblés et 16 tests PostgreSQL isolés, sans échec. La pagination globale, le tri sur timestamps égaux, les limites, le double rôle et un offset supérieur à la limite JPA sont testés. Les JWT sont simulés.
+- **Validation manuelle :** l'apprenant a confirmé via Postman que l'opérateur voit plusieurs profils et que les pages 0 et 1 de taille 1 contiennent des profils différents ; il valide la tâche. Les autres limites et le double rôle n'ont pas été confirmés manuellement.
 
-- [ ] 7.4 **CPS-TEST-01** — Compléter les tests unitaires
+- [x] 7.4 **CPS-TEST-01** — Compléter les tests unitaires
 
 - **Objectif / résultat :** règles du domaine testées sans infrastructure.
 - **Dépendances :** CPS-DOM-01, CPS-API-02, CPS-API-04, CPS-API-07.
@@ -494,7 +494,7 @@ défaut en l'absence de profil explicite.
 - **Commandes :** `mvn -pl customer-service -Dtest='*Test' test`.
 - **Vérification / acceptation :** validation, canonicalisation, mapping, codes et pagination couverts; pas de DB ou Keycloak requis.
 - **Erreurs / diagnostic :** flakiness/ordre-dépendance; rejouer les tests et isoler fixtures.
-- **Point d’arrêt :** attendre suite unitaire avant intégration.
+- **Preuve et validation :** l'apprenant a exécuté `mvn -pl customer-service "-Dtest=*Test" test` et rapporté 42 tests réussis. Après ajout d'un test du mapping de la réponse Customer, la même suite a été relancée avec `BUILD SUCCESS` : 43 tests, aucun échec, aucune erreur et aucun test ignoré. La suite comprend aussi des tests MVC et un serveur JWKS local simulé ; elle ne nécessite ni PostgreSQL ni Keycloak. L'apprenant valide la tâche.
 
 - [ ] 7.5 **CPS-TEST-02** — Valider PostgreSQL, Flyway et Keycloak avec Testcontainers
 
@@ -506,7 +506,8 @@ défaut en l'absence de profil explicite.
 - **Commandes :** `docker info`; `mvn -pl customer-service -Pintegration-tests verify`.
 - **Vérification / acceptation :** PostgreSQL et Keycloak démarrés/nettoyés automatiquement; migration, JWT, rôles, unicité et idempotence validés; aucun serveur partagé.
 - **Erreurs / diagnostic :** accès registry, daemon ou incompatibilité issuer; lire logs Testcontainers sans désactiver la validation.
-- **Point d’arrêt :** attendre logs/tests complets avant E2E.
+- **Preuve automatisée :** `mvn -pl customer-service -Pintegration-tests verify` a retourné `BUILD SUCCESS` : 43 tests sans containers et 21 tests d'intégration, sans échec ni test ignoré. Les tests incluent PostgreSQL isolé, migrations V1 et V2 sur base neuve et mise à niveau V1 vers V2, contraintes et idempotence ; un Keycloak temporaire émet de vrais JWT vérifiés par Customer (issuer, clés JWKS et audience). Les lectures, rôles, refus et rejeu sont vérifiés ; le test utilise MockMvc et ne traverse pas Gateway. Les conteneurs de cette exécution ont été vérifiés supprimés. Les tests de concurrence utilisent un seul contexte applicatif.
+- **Point d’arrêt :** attendre la validation de l'apprenant avant de cocher la tâche et de passer à E2E.
 
 - [ ] 7.6 **CPS-E2E-01** — Valider le parcours via Gateway
 
