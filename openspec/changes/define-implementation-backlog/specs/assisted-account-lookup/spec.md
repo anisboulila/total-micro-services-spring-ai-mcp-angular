@@ -31,14 +31,16 @@ The system MUST answer the approved account-owner question using only authorized
 #### Scenario: LLM ou API métier indisponible
 - **GIVEN** l’assistant ne peut pas obtenir une réponse fiable d’un service métier ou du LLM local
 - **WHEN** la requête est traitée
-- **THEN** l’utilisateur reçoit un message contrôlé indiquant l’indisponibilité et peut réessayer
+- **THEN** l’utilisateur reçoit un message contrôlé indiquant l’indisponibilité et peut émettre une nouvelle demande
 - **AND** aucune réponse d’association n’est fabriquée
+- **AND** aucune opération métier n’est rejouée automatiquement par l’assistant
 
 #### Scenario: Lecture seule et modèle local
 - **GIVEN** l’assistant traite une question UC-07
 - **WHEN** il choisit ses outils et son modèle
 - **THEN** les outils MCP ne réalisent que des lectures via les API métier
-- **AND** aucun accès direct à une base métier, écriture, Agent, RAG ou fournisseur LLM distant n’est utilisé
+- **AND** l’identifiant de compte et le nom du client présentés proviennent exclusivement des DTO métier validés
+- **AND** aucun attribut métier généré hors de ces DTO, accès direct à une base métier, écriture, Agent, RAG ou fournisseur LLM distant n’est utilisé
 
 ### Requirement: US-09 — Consulter l’historique de conversation autorisé
 

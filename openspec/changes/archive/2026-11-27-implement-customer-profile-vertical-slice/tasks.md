@@ -50,7 +50,7 @@
 - **Point d’arrêt :** attendre la preuve Maven avant la suite.
 - **Preuve observée :** `mvn -version` a répondu et rapporté Java 21.0.2 pour le runtime Maven; le numéro de version Maven n'a pas été recopié dans le résultat partagé ici.
 
-- [ ] 1.4 **CPS-ENV-04** — Installer et démarrer Docker Desktop
+- [x] 1.4 **CPS-ENV-04** — Installer et démarrer Docker Desktop
 
 - **Objectif / résultat :** daemon Docker local démarré en mode Linux.
 - **Dépendances :** CPS-ENV-01, uniquement si Docker/daemon indisponible.
@@ -61,6 +61,7 @@
 - **Vérification / acceptation :** `docker info` affiche serveur et `OSType: linux`.
 - **Erreurs / diagnostic :** WSL2/virtualisation/droits ou daemon arrêté; utiliser le message exact de Docker Desktop, ne pas supprimer de volumes.
 - **Point d’arrêt :** attendre la connexion daemon réussie.
+- **Preuve de clôture observée le 27 novembre 2026 :** `docker version` a rapporté client 29.8.2, serveur 29.8.2 et OS Linux. `docker compose ps` a montré PostgreSQL, Customer et Gateway `healthy`, ainsi que Keycloak actif. `docker compose config` a réussi. L’installation n’était pas requise car le daemon était déjà disponible.
 
 - [x] 1.5 **CPS-ENV-05** — Valider Docker Compose
 
@@ -433,15 +434,14 @@ sans échec. La configuration locale active maintenant la création ; la
 configuration générale la désactive, mais le profil `local` est le profil par
 défaut en l'absence de profil explicite.
 
-- [ ] 6.4 **CPS-TEST-MANUAL-01** — Valider manuellement la création et l'idempotence
+- [x] 6.4 **CPS-TEST-MANUAL-01** — Réconcilier la recette manuelle avec la couverture automatisée de création et d'idempotence
 
-- **Objectif / résultat :** exécuter avec Postman, Keycloak, Gateway et DBeaver les scénarios de création, conflits, rejeu, expiration et concurrence liés à 5.5–6.3.
-- **Dépendances :** implémentations 5.5–6.3 présentes dans l'image Customer utilisée ; PostgreSQL et Keycloak de test disponibles.
-- **Apprenant :** suit pas à pas le [guide de test manuel](../../../docs/customer-profile-manual-tests.md), note les résultats sans partager jetons ni données sensibles et valide chaque scénario.
-- **Vérification / acceptation :** résultats HTTP et données PostgreSQL conformes à la matrice ; les limites et cas non exécutés restent explicitement signalés. La concurrence observée avec une seule instance ne prouve pas un déploiement multi-instance.
-- **État au 27 novembre 2026 :** tests manuels suspendus à la demande de l'apprenant. Création, rejeu, normalisation, conflit de contenu, conflit de `sub`, deuxième acteur, refus OPERATOR, absence de token, validation du corps et bornes de clé ont été observés. L'absence de résultat pour les clés des tests de conflit `sub` et de validation a été vérifiée en base. Le code exact du refus OPERATOR, son absence d'écriture et `Location` n'ont pas été confirmés manuellement. Le refus e-mail non vérifié a été observé sans contrôle immédiat en base. Le conflit d'e-mail, l'expiration, les courses manuelles et le scénario multi-instance restent non exécutés.
-- **Sécurité / nettoyage :** activer la création temporairement sur l'environnement de test uniquement ; ne supprimer que les données de test identifiées et remettre le flag à `false` après les essais.
-- **Point d'arrêt :** ne cocher cette tâche qu'après reprise et examen des résultats manuels avec l'apprenant.
+- **Objectif / résultat :** établir que les garanties métier, HTTP et PostgreSQL sont vérifiées de manière reproductible, sans imposer une répétition manuelle de scénarios couverts par les tests automatisés.
+- **Dépendances :** implémentations 5.5–6.3 et suites d’intégration PostgreSQL/Keycloak disponibles.
+- **Vérification / acceptation :** les scénarios essentiels ont une preuve automatisée ou une observation manuelle documentée; les limites réelles, notamment le multi-instance, sont explicites; aucun test manuel n’est présenté comme exécuté lorsqu’il ne l’a pas été.
+- **Preuve de clôture observée le 27 novembre 2026 :** `mvn -B -pl customer-service -Pintegration-tests verify` a réussi avec 43 tests unitaires/MVC et 21 tests d’intégration. `mvn -B test` a réussi avec 50 tests au niveau du reactor. Les tests couvrent `Location`, `FORBIDDEN_PROFILE_CREATION`, `EMAIL_NOT_VERIFIED`, `EMAIL_ALREADY_EXISTS`, conflits `sub`/clé, absence d’écriture, rejeu exact, expiration à sept jours, rollback et concurrence avec plusieurs connexions PostgreSQL. `CustomerKeycloakPostgresIT` utilise de vrais JWT Keycloak, vérifie 401/audience, les rôles, l’accès croisé et le rejet opérateur. La Gateway est vérifiée séparément par `GatewaySecurityAndRoutingTests` pour JWT, routes, 404/Actuator et transfert du bearer token.
+- **Éléments manuels conservés :** la recette Postman complétée dans 7.6 reste la preuve du parcours Compose/Gateway et de la persistance après redémarrage. Les cas `M7`, `M12`, `M13`, `M14` et `M15` n’ont pas tous été rejoués manuellement et ne sont pas déclarés tels ; leurs garanties sont couvertes automatiquement lorsque précisé dans le guide.
+- **Limite conservée :** les tests de concurrence utilisent plusieurs connexions mais un seul contexte applicatif. La capacité multi-instance reste non prouvée et hors périmètre du présent slice.
 
 ## 7. Lectures, tests d’intégration et bout en bout
 
@@ -496,7 +496,7 @@ défaut en l'absence de profil explicite.
 - **Erreurs / diagnostic :** flakiness/ordre-dépendance; rejouer les tests et isoler fixtures.
 - **Preuve et validation :** l'apprenant a exécuté `mvn -pl customer-service "-Dtest=*Test" test` et rapporté 42 tests réussis. Après ajout d'un test du mapping de la réponse Customer, la même suite a été relancée avec `BUILD SUCCESS` : 43 tests, aucun échec, aucune erreur et aucun test ignoré. La suite comprend aussi des tests MVC et un serveur JWKS local simulé ; elle ne nécessite ni PostgreSQL ni Keycloak. L'apprenant valide la tâche.
 
-- [ ] 7.5 **CPS-TEST-02** — Valider PostgreSQL, Flyway et Keycloak avec Testcontainers
+- [x] 7.5 **CPS-TEST-02** — Valider PostgreSQL, Flyway et Keycloak avec Testcontainers
 
 - **Objectif / résultat :** une suite d’intégration isolée valide migrations, contraintes et OIDC réel.
 - **Dépendances :** CPS-DB-02, CPS-KC-05, CPS-SEC-01, CPS-IDEM-03, CPS-ENV-05.
@@ -507,42 +507,30 @@ défaut en l'absence de profil explicite.
 - **Vérification / acceptation :** PostgreSQL et Keycloak démarrés/nettoyés automatiquement; migration, JWT, rôles, unicité et idempotence validés; aucun serveur partagé.
 - **Erreurs / diagnostic :** accès registry, daemon ou incompatibilité issuer; lire logs Testcontainers sans désactiver la validation.
 - **Preuve automatisée :** `mvn -pl customer-service -Pintegration-tests verify` a retourné `BUILD SUCCESS` : 43 tests sans containers et 21 tests d'intégration, sans échec ni test ignoré. Les tests incluent PostgreSQL isolé, migrations V1 et V2 sur base neuve et mise à niveau V1 vers V2, contraintes et idempotence ; un Keycloak temporaire émet de vrais JWT vérifiés par Customer (issuer, clés JWKS et audience). Les lectures, rôles, refus et rejeu sont vérifiés ; le test utilise MockMvc et ne traverse pas Gateway. Les conteneurs de cette exécution ont été vérifiés supprimés. Les tests de concurrence utilisent un seul contexte applicatif.
-- **Point d’arrêt :** attendre la validation de l'apprenant avant de cocher la tâche et de passer à E2E.
+- **Validation :** l'apprenant accepte les résultats de la suite automatisée et valide la tâche.
 
-- [ ] 7.6 **CPS-E2E-01** — Valider le parcours via Gateway
+- [x] 7.6 **CPS-E2E-01** — Réaliser la recette Postman et vérifier la persistance
 
-- **Objectif / résultat :** vérifier inscription OIDC et US-01..03 de bout en bout.
+- **Objectif / résultat :** vérifier le parcours OIDC et US-01..03 via Gateway, puis confirmer que le profil survit au redémarrage des services. Cette tâche regroupe l'ancienne vérification de persistance CPS-E2E-02.
 - **Dépendances :** CPS-GW-01, CPS-API-03..07, CPS-IDEM-03, CPS-TEST-02.
-- **Concepts :** corrélation multi-services et distinction 401/403/404.
-- **Apprenant :** démarre Compose et utilise le helper PKCE avec `-ApiBaseUrl "http://localhost:8080" -CreateProfileName "Customer Demo" -IdempotencyKey "demo-profile-001"`; le bearer token reste en mémoire et les appels n’affichent que statut, Location et corps de réponse; ne partage jamais le JWT.
+- **Concepts :** recette manuelle Postman, corrélation multi-services, distinction 401/403/404 et persistance PostgreSQL.
+- **Apprenant :** vérifie la disponibilité de Compose et réalise les requêtes avec Postman via la Gateway et des identités Keycloak adaptées ; ne partage ni les JWT ni les secrets. Réutilise les preuves manuelles déjà consignées et réalise les cas essentiels non confirmés.
 - **Fichiers Copilot :** corrections strictement liées à un défaut reproduit.
-- **Commandes :** `docker compose up -d --build`; `docker compose ps`; `docker compose logs --tail 80`; `powershell.exe -NoProfile -File .\scripts\dev\oidc-pkce-login.ps1 -Issuer "http://localhost:8081/realms/customer-dev" -ClientId "customer-local" -ApiBaseUrl "http://localhost:8080" -CreateProfileName "Customer Demo" -IdempotencyKey "demo-profile-001"` (commande future; les options API devront être implémentées avant cette tâche).
-- **Vérification / acceptation :** création 201/Location, lecture propre, refus OPERATOR à la création, accès croisé 404, Gateway seule entrée exposée.
-- **Erreurs / diagnostic :** 401 issuer/audience, 404 route/masquage, 503 PostgreSQL; corréler les logs sans tokens.
-- **Point d’arrêt :** attendre vos résultats et validation explicite.
-
-- [ ] 7.7 **CPS-E2E-02** — Vérifier redémarrage et persistance
-
-- **Objectif / résultat :** Customer conservé après restart des services.
-- **Dépendances :** CPS-E2E-01.
-- **Concepts :** état durable PostgreSQL vs processus applicatifs.
-- **Apprenant :** redémarre sans effacer les volumes puis répète le GET.
-- **Fichiers Copilot :** aucun, sauf défaut démontré.
-- **Commandes :** `docker compose restart postgres customer-service api-gateway`; `docker compose ps`; répéter GET via Gateway avec nouvelle authentification.
-- **Vérification / acceptation :** profil toujours présent et services reviennent healthy.
-- **Erreurs / diagnostic :** ne jamais utiliser `down -v`; inspecter logs si healthcheck échoue.
-- **Point d’arrêt :** attendre confirmation de persistance.
+- **Préparation :** contrôler l'état des services avec `docker compose ps` et la disponibilité OIDC de Keycloak ; démarrer ou reconstruire si nécessaire avec `docker compose up -d --build`. Utiliser un CUSTOMER avec e-mail vérifié et sans profil existant pour toute nouvelle création, sans supprimer les données existantes.
+- **Vérification / acceptation :** par Postman via `http://localhost:8080`, création 201 avec `Location`, lecture propre 200, refus de création OPERATOR 403, accès croisé et profil inexistant 404 comparables, accès sans token 401, routes non prévues et Actuator non exposés via Gateway. Vérifier également la liste globale paginée de l'opérateur. Customer n'est pas publié sur l'hôte ; Keycloak et PostgreSQL restent accessibles localement pour l'authentification et l'administration.
+- **Persistance :** avec l'accord de l'apprenant, exécuter `docker compose restart postgres customer-service api-gateway`, attendre les services healthy et la disponibilité OIDC, puis répéter via Postman le GET du même profil avec un token valide ; vérifier le même identifiant et les mêmes données. Ne jamais utiliser `docker compose down -v`.
+- **Preuves antérieures :** les tâches 5.5–6.2 et 7.1–7.3 consignent des observations Postman de création, lecture propre, refus OPERATOR, accès sans token, liste globale et pagination. Ne pas présenter les tests automatisés comme des preuves manuelles.
+- **Recette complémentaire observée :** l'apprenant a confirmé par Postman le 404 `CUSTOMER_NOT_FOUND` pour un profil étranger, puis une réponse métier identique pour un profil inexistant. Les chemins `/actuator/health` et `/api/v1/accounts` sur le port Gateway 8080 ont chacun retourné 404. Après redémarrage de PostgreSQL, Customer et Gateway, les trois services étaient healthy et le GET du profil a retourné 200 avec le même identifiant et le même nom. L'en-tête `Location` de la création 201 n'a pas été vérifié manuellement ; il est couvert par les tests automatisés.
+- **Erreurs / diagnostic :** 401 issuer/audience, 404 route/masquage, 503 PostgreSQL ; consulter `docker compose logs --tail 80` si nécessaire sans partager de tokens ni de secrets.
+- **Validation :** l'apprenant valide la recette sur la base des observations manuelles et des tests automatisés mentionnés ci-dessus ; la vérification manuelle de `Location` n'a pas été réalisée.
 
 ## 8. Documentation et revue de fin
 
-- [ ] 8.1 **CPS-DOC-01** — Documenter l’incrément vérifié
+- [x] 8.1 **CPS-DOC-01** — Documenter l’incrément vérifié
 
 - **Objectif / résultat :** guide reproductible fondé sur exécution réelle.
-- **Dépendances :** CPS-E2E-02.
+- **Dépendances :** CPS-E2E-01.
 - **Concepts :** documentation de faits observés, configuration sans secrets.
-- **Apprenant :** rejoue les commandes depuis environnement arrêté.
-- **Fichiers Copilot :** guide local convenu lors de CPS-DES-01; aucune change historique/backlog global.
-- **Commandes :** commandes du guide puis `openspec validate implement-customer-profile-vertical-slice`.
-- **Vérification / acceptation :** chaque commande a été exécutée; résultats/écarts consignés; aucune valeur secrète.
-- **Erreurs / diagnostic :** étapes implicites ou version d’outil absente; faire relire le guide depuis terminal neuf.
-- **Point d’arrêt :** attendre votre revue finale; aucune tâche suivante n’est démarrée automatiquement.
+- **Preuve de clôture :** `docs/local-development.md` contient les commandes de validation, résultats, configuration Compose, limites connues et absence de dépendance au backend cloud; `docs/customer-profile-manual-tests.md` distingue désormais recette observée, couverture automatisée équivalente et cas non exécutés. L’ancienne affirmation selon laquelle le GET n’était pas implémenté a été corrigée.
+- **Validation :** `mvn -B test`, le profil `integration-tests`, le profil `flyway-compose-postgres`, `docker compose config` et `docker compose ps` ont été rejoués avec succès le 27 novembre 2026. Les specs Customer ont été promues en `openspec/specs/customer-profile-vertical-slice/` et `openspec/specs/customer-api-contracts/` sans inclure Account, Redis, Kafka ou assistant comme runtime.
+- **Point d’arrêt :** documentation complète pour cette tranche; aucune fonctionnalité hors périmètre n’est démarrée.

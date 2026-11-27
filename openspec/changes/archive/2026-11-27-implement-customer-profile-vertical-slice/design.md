@@ -113,7 +113,7 @@ DB-02 + DOM-01 + SEC-01 + API-01/02 ──► API-03/04
 API-03 + DB-02 ──► IDEM-01 ──► IDEM-02 ──► IDEM-03
 SEC-01 + API-03 ──► API-05 ──► API-06
 API-05 + SEC-01 ──► API-07
-API/domain tasks ──► TEST-01 ──► TEST-02 ──► E2E-01 ──► E2E-02 ──► DOC-01
+API/domain tasks ──► TEST-01 ──► TEST-02 ──► E2E-01 (Postman + persistance) ──► DOC-01
 ```
 
 Le numéro après le préfixe de groupe OpenSpec n’est pas l’identifiant CPS;

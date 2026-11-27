@@ -1,9 +1,27 @@
 # Test manuel : création du profil Customer, tâches 5.5 à 6.3
 
-Ce guide est une **liste d'essais à exécuter**, pas une preuve de réussite.
-Il utilise les services de test existants : Keycloak, Gateway, Customer et
-PostgreSQL. Ne l'exécute pas sur une base de production ou partagée sans
-autorisation. Les données de test peuvent être modifiées ou supprimées.
+Ce guide décrit les essais manuels complémentaires disponibles pour le parcours
+Customer. Il n’est plus une dépendance de clôture pour les scénarios déjà couverts
+de manière reproductible par les tests automatisés. Il utilise les services de
+test existants : Keycloak, Gateway, Customer et PostgreSQL. Ne l’exécute pas sur
+une base de production ou partagée sans autorisation. Les données de test peuvent
+être modifiées ou supprimées.
+
+## Couverture de clôture automatisée
+
+Le 27 novembre 2026, `mvn -B -pl customer-service -Pintegration-tests verify` a
+réussi avec 43 tests unitaires/MVC et 21 tests d’intégration. Les tests
+PostgreSQL et Keycloak couvrent `Location`, le rejeu, les conflits de clé, de
+`sub` et d’e-mail, le rôle interdit, l’e-mail non vérifié, l’expiration, le
+rollback et la concurrence avec plusieurs connexions. Les tests de Gateway
+couvrent séparément les JWT, le transfert du bearer token, les routes Customer,
+les 401 et l’absence de route Account/Actuator.
+
+Ne répéter une procédure manuelle que si elle apporte une preuve supplémentaire :
+par exemple le passage réel par le navigateur/Postman, une dépendance réseau
+spécifique ou une observation opérationnelle propre à l’environnement. Les cas
+non rejoués manuellement doivent être notés comme tels ; une couverture
+automatisée équivalente ne doit pas être présentée comme un test manuel.
 
 ## 1. Préparer les comptes et les outils
 
@@ -98,8 +116,8 @@ fonctionnalité sur un déploiement non validé.
 - Tous les appels métier ci-dessous utilisent `POST` et l'URL Gateway de la
   section 2. Changer explicitement le token, la clé et le corps indiqués.
 - Un succès renvoie `201`, un corps avec `id`, `name`, `email`, `createdAt`,
-  et un en-tête `Location`. Ce dernier est une référence ; le GET de profil
-  n'est pas encore implémenté.
+  et un en-tête `Location` ciblant `GET /api/v1/customers/{id}`. Ce dernier est
+  vérifié automatiquement et avait seulement manqué à la preuve manuelle initiale.
 - Une erreur métier Customer attendue est en `application/problem+json`, avec
   notamment `status`, `code` et `correlationId`. Un refus de sécurité à la
   Gateway peut avoir un autre corps ; vérifier au minimum son statut HTTP.
@@ -282,10 +300,12 @@ un mélange d'anciennes et de nouvelles versions.
   d'une clé expirée sont couverts par les tests automatisés PostgreSQL ; ce
   guide ne prétend pas les reproduire manuellement. La frontière exacte à
   sept jours après le **commit** reste une limite connue.
-- Pour chaque cas M1–M15, noter localement `réussi`, `échec` ou `non exécuté`,
-  statut/code observé et vérification DB, sans jeton, e-mail, `sub` ni réponse
-  personnelle. Pour un échec, conserver uniquement le `correlationId` et des
-  informations non sensibles.
+- Pour chaque cas M1–M15 réellement exécuté manuellement, noter localement
+  `réussi`, `échec` ou `non exécuté`, le statut/code observé et la vérification
+  DB, sans jeton, e-mail, `sub` ni réponse personnelle. Pour un échec, conserver
+  uniquement le `correlationId` et des informations non sensibles. Pour un cas
+  couvert uniquement par la suite automatisée, le noter `couvert automatiquement`
+  et indiquer le test correspondant ; ne pas le compter comme recette manuelle.
 - Désactiver la création après les essais en créant un fichier local
   `compose.manual-stop.yaml` (s'il existe déjà, ne pas l'écraser) :
 

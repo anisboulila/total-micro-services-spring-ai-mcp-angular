@@ -644,3 +644,34 @@ run did not have the test-only probe controller on its classpath, so Spring
 MVC could not resolve that path after authentication and raised
 `NoResourceFoundException`. The explicit Maven profile made the test route
 available; no production security rule or JWT validator was weakened.
+
+## Verification de clôture du vertical slice Customer
+
+Le 27 novembre 2026, la clôture du périmètre Customer a été rejouée depuis la
+racine avec les commandes suivantes :
+
+```powershell
+mvn -B test
+mvn -B -pl customer-service -Pintegration-tests verify
+mvn -B -pl customer-service -Pflyway-compose-postgres verify
+docker compose config
+docker compose ps
+```
+
+Résultats observés : le reactor a réussi avec 50 tests ; le profil
+`integration-tests` a réussi avec 43 tests unitaires/MVC et 21 tests
+d’intégration ; le profil `flyway-compose-postgres` a réussi avec 43 tests et
+7 tests d’intégration ; PostgreSQL, Customer et Gateway étaient `healthy`, et
+Keycloak était actif. Aucun échec, erreur ou test ignoré n’a été observé.
+
+Ces vérifications couvrent les migrations V1/V2, l’idempotence, les conflits,
+la pagination, les rôles, les accès croisés, les JWT Keycloak réels, les routes
+Gateway et la concurrence PostgreSQL avec plusieurs connexions. Elles ne
+prouvent pas encore le déploiement multi-instance : le test concurrent utilise
+un seul contexte applicatif. Cette limitation est connue et ne modifie pas les
+garanties attendues du vertical slice.
+
+Le parcours Postman/Gateway historique reste documenté dans
+`customer-profile-manual-tests.md`. Sa répétition n’est plus requise pour un cas
+déjà couvert de façon équivalente par les tests automatisés ; ne jamais inscrire
+un résultat manuel sans observation effective.

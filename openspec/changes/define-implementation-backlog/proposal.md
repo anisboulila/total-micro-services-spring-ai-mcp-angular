@@ -14,6 +14,10 @@ incertitudes explicitement bloquantes, sans modifier les décisions historiques.
   leurs critères Given/When/Then à partir des arbitrages actuels du propriétaire.
 - Spécifier le comportement v1 des parcours Customer/Account, du consommateur
   d’audit Kafka et de l’assistant Spring AI/MCP avec son historique.
+- Intégrer la progression pédagogique Spring AI → Tool Calling Java → MCP →
+  consultation Customer sécurisée comme préparation technique de US-08, sans
+  créer de User Story supplémentaire ni recopier le détail de la change
+  `introduce-agentic-profile-lookup`.
 - Traduire les décisions techniques déjà actées en tâches, sans les redécider;
   ordonner les tâches, tests et mises à jour documentaires selon leurs
   dépendances.
@@ -43,8 +47,12 @@ change jusqu’à revue et archivage ultérieurs.
 
 - Ajoute les artefacts de backlog à `openspec/changes/define-implementation-backlog/`
   uniquement.
-- S’appuie sur `requirements.md`, `PROJECT-CONTEXT.md` et les changes des Étapes
-  1 à 4, sans modifier ces sources ni réécrire H-6, UC-07 ou DEC-07.
+- S’appuie sur `requirements.md`, `PROJECT-CONTEXT.md`, les changes des Étapes
+  1 à 4 et `introduce-agentic-profile-lookup`, sans modifier les sources ni
+  réécrire H-6, UC-07, DEC-07, DEC-16 ou les décisions historiques.
+- La change `introduce-agentic-profile-lookup` porte les tâches pédagogiques
+  détaillées du premier assistant Customer; ce backlog global conserve les
+  jalons, dépendances et critères de passage vers US-08 puis US-09.
 - Aucun code applicatif, dépendance, fichier de configuration runtime,
   déploiement ou infrastructure n’est modifié.
 - Toute implémentation attendra la revue et l’approbation explicites du backlog.

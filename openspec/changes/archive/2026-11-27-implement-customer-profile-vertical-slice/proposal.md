@@ -29,6 +29,8 @@ persistance PostgreSQL.
 - Utiliser une procédure locale Authorization Code + PKCE pour valider
   Keycloak sans frontend applicatif; les jetons et codes restent en mémoire sur
   le poste et ne sont jamais communiqués à Copilot.
+- Réaliser la recette manuelle du parcours Gateway et de sa persistance avec
+  Postman ; réutiliser les preuves observées et compléter les cas non confirmés.
 
 ## Capabilities
 

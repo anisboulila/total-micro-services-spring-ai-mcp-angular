@@ -101,6 +101,21 @@ mais leur statut HTTP exact est une décision technique ouverte.
 - **DEC-20 / Helm** : Kubernetes reste conditionnel et Helm différé; ils ne
   figurent pas dans le backlog d’implémentation v1.
 
+La décision DEC-16 reste historiquement celle d’outils MCP internes en lecture
+seule, placés au-dessus des API des services propriétaires. Le plan courant
+raffine son exécution avec un adaptateur `customer-mcp-server` séparé : il ne
+possède ni données ni règles métier et ne devient pas un second service
+propriétaire. Cette séparation est technique et réversible; elle n’altère pas
+la décision historique selon laquelle MCP reste interne et délègue
+l’autorisation aux services métier.
+
+Le parcours agentique est construit par jalons pédagogiques plutôt que comme un
+besoin métier supplémentaire : Spring AI sans outil, Tool Calling Java local,
+puis MCP pédagogique, puis MCP relié à la lecture Customer existante. Seul ce
+dernier jalon constitue une modalité conversationnelle de US-03 et prépare le
+chemin Account → Customer de US-08. Les détails d’exécution appartiennent à la
+change `introduce-agentic-profile-lookup`.
+
 ### Stories, rattachement et ordre indicatif
 
 Les priorités P0/P1/P2 sont des **propositions de séquencement**, pas des
@@ -120,9 +135,10 @@ les lectures Customer parce que DEC-12 la rend dépendante de celles-ci.
 | US-09 | Consulter l’historique de conversation autorisé | UC-07 | P1 |
 
 US-07 est un scénario système confirmé, pas un nouveau cas d’usage métier ni
-une API de consultation d’audit. La Gateway, Redis, Compose, l’observabilité,
-la CI et les tests restent des tâches techniques rattachées aux décisions
-DEC-xx, pas de nouvelles capacités utilisateur.
+une API de consultation d’audit. Spring AI, Tool Calling, MCP, le serveur
+MCP adaptateur, la Gateway, Redis, Compose, l’observabilité, la CI et les tests
+restent des mécanismes ou tâches techniques rattachés aux décisions DEC-xx,
+pas de nouvelles capacités utilisateur.
 
 ### Dépendances entre parcours
 
@@ -130,11 +146,21 @@ DEC-xx, pas de nouvelles capacités utilisateur.
 API Gateway ──► API Customer/Account (autorisation dans les services propriétaires)
 Keycloak / rôles ──► US-01 ──► US-02, US-03
                          └──► US-06 (compte client)
-US-01 + US-03 ──► US-04, US-05 ──► US-08
 US-01 + US-06 ──► US-07 (outbox, Kafka, audit-service)
-US-08 ──► US-09 (historique et écran)
 US-03 ──► tâche Redis DEC-12
+      └──► Spring AI sans outil
+             └──► Tool Calling Java
+                    └──► MCP pédagogique interne
+                           └──► MCP Customer sur REST sécurisée
+US-04 + US-05 + parcours Customer assisté ──► US-08
+US-08 ──► US-09 (historique et écran)
 ```
+
+US-08 reste le besoin conversationnel validé portant sur le propriétaire d’un
+compte. Le parcours Customer assisté est un prérequis technique démontrant le
+socle Spring AI/MCP, pas une nouvelle story et pas une dépendance de US-09 prise
+isolément. US-09 dépend toujours d’un parcours conversationnel achevé, donc au
+minimum de US-08 dans le périmètre global.
 
 Les tests et la documentation nécessaires sont livrés avec chaque groupe de
 tâches concerné; le groupe final ne contient que des vérifications
@@ -152,13 +178,13 @@ sans arbitrage; cela ne retarde pas les stories sans dépendance vers ce point.
 | TD-03 | Détails de validation non métier (longueur/normalisation de `name`, claim email absent/non vérifié, corps d’UC-06 pour les champs fixés, statut de rejet `customerId`) | Forme des DTO et assertions HTTP | US-01, US-06 | Avant contrats API | T-3.1, T-4.2 |
 | TD-04 | Ordre stable des listes et traitement d’un `pageSize` supérieur à 100 (rejet ou plafonnement) | Contrat API et pagination testable | UC-01, UC-04 | Avant API de listes | T-3.3, T-4.1 |
 | TD-05 | Empreinte canonique du corps, réutilisation après expiration, erreurs idempotentes autres que le conflit déjà arbitré | Rejeu fiable et stockage des réponses | Arbitrages idempotence | Avant POST idempotents | T-3.2, T-4.3 |
-| TD-06 | Noms des rôles/claims Keycloak et propagation du jeton utilisateur vers les services et outils MCP (transfert ou échange) | Autorisations par service et confidentialité | DEC-10/16, US-01, US-08 | Avant sécurisation de la Gateway et de MCP | T-2.2, T-4.5, T-7.1 |
+| TD-06 — DÉCIDÉ | Appliquer les rôles/claims Keycloak et la propagation contrôlée du bearer token d’origine vers assistant, MCP et services propriétaires du POC; le token exchange reste hors v1 sauf exigence ultérieure | Autorisations par service, audiences et confidentialité | DEC-10/16, US-01, US-08; décision détaillée dans `resolve-backlog-technical-decisions` | Avant sécurisation du parcours assistant/MCP | T-2.2, T-4.5, T-7.4, T-7.5 |
 | TD-07 | Outil de migration PostgreSQL, contraintes exactes/indices et représentation persistée de la devise EUR | Évolution du schéma et intégrité | DEC-03/04 et arbitrages Customer/Account | Avant migrations métier | T-3.1, T-4.1, T-4.2 |
 | TD-08 | Outils de tests d’intégration/contrat/UI, Testcontainers ou équivalent, simulation du LLM | Répétabilité de la stratégie DEC-22 | Décisions d’outillage | Avant les suites automatisées | T-1.2, tâches de test |
 | TD-09 | TTL Redis, comportement en panne et éventuelle invalidation; aucune modification/suppression Customer n’est dans le périmètre, et l’invalidation à la création n’est utile que si des résultats négatifs sont mis en cache | Fraîcheur et disponibilité du cache | DEC-12, US-03 | Avant la tâche Redis | T-5.1 |
 | TD-10 | Stockage de l’audit, sémantique de « un mois », fréquence de purge et accès opérationnel | Confidentialité et fin de rétention | US-07 | Avant le consumer d’audit | T-6.3 |
-| TD-11 | Modèle local/version, limites/timeout, prompt et définition des résultats d’évaluation | Disponibilité, coût local et reproductibilité IA | DEC-15, US-08 | Avant l’intégration LLM | T-7.1 |
-| TD-12 | Stockage des conversations, définition d’une conversation, configuration de rétention et purge; traitements d’erreur à historiser | Données personnelles et consultation admin/client | US-08, US-09 | Avant stockage/UI d’historique | T-7.2 |
+| TD-11 | Modèle local/version, transport MCP, prompt, timeouts, limite d’un appel outil et tests déterministes; évaluation statistique et métriques de coût reportées | Reproductibilité du socle agentique sans complexité prématurée | DEC-15/16, US-03 assisté, US-08 | Avant l’intégration LLM | T-1.9, T-7.1 à T-7.5 |
+| TD-12 | Stockage des conversations, définition d’une conversation, configuration de rétention et purge; traitements d’erreur à historiser | Données personnelles et consultation admin/client | US-08, US-09 | Avant stockage/UI d’historique | T-1.10, T-7.6, T-7.7 |
 | TD-13 | Backend d’observabilité et instrumentation retenue dans les standards ouverts | Exploitation locale sans introduire un backend non arbitré | DEC-13 | Avant Compose d’observabilité | T-8.1 |
 | TD-14 | Forme du contrat d’erreur partagé et codes pour les rejets de validation hors 404/409/503 confirmés | Cohérence API et tests | DEC-06/11, TD-03 | Avant les contrats REST | T-3.1, T-4.2 |
 
@@ -177,9 +203,14 @@ implicite n’est considérée comme approuvée.
   L’arbitrage courant retient maintenant audit-service et la trace minimale;
   DEC-07, ADR-03/04 et les textes de l’Étape 4 restent inchangés.
 - UC-07 demeure historiquement **DÉDUIT / À CONFIRMER** et ADR-12 demeure
-  conditionnel dans la change ADR. L’arbitrage courant approuve le parcours
-  produit; le backlog conserve les statuts historiques tout en utilisant la
-  décision actuelle pour les futures tâches.
+  conditionnel dans la change ADR. L’arbitrage courant approuve US-08 et US-09
+  dans ce backlog; le backlog conserve les statuts historiques et utilise le
+  parcours Customer assisté seulement comme jalon technique préparatoire, sans
+  promouvoir rétroactivement UC-07.
+- DEC-16 demeure historiquement une décision d’outils MCP internes en lecture
+  seule au-dessus des API propriétaires. Le serveur `customer-mcp-server`
+  séparé est l’adaptateur technique retenu pour isoler le protocole; il ne
+  déplace ni données ni autorisation hors de `customer-service`.
 - Les anciennes sources évoquent une consultation d’historique comme ouverte;
   l’arbitrage actuel inclut un écran protégé et exclut la suppression manuelle.
 
