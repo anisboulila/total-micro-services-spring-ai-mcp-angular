@@ -13,6 +13,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -76,5 +78,27 @@ class CustomerApplicationServiceTest {
         when(customerRepository.findBySub("subject")).thenReturn(Optional.of(customer));
         assertEquals(Optional.of(customer), service.findByVerifiedSubject("subject"));
         verify(customerRepository).findBySub("subject");
+    }
+
+    @Test
+    void selectsRepositoryQueryAccordingToReadPermission() {
+        CustomerApplicationService service = new CustomerApplicationService(customerRepository, Clock.systemUTC());
+        UUID id = UUID.fromString("12345678-1234-1234-1234-123456789012");
+        service.findReadable(id, "subject", false);
+        service.findReadable(id, "subject", true);
+        verify(customerRepository).findByIdAndSub(id, "subject");
+        verify(customerRepository).findById(id);
+    }
+
+    @Test
+    void largeOffsetUsesPostgresQueryRatherThanAssumingPageIsEmpty() {
+        CustomerApplicationService service = new CustomerApplicationService(customerRepository, Clock.systemUTC());
+        long offset = 2_147_483_648L;
+        Customer customer = Customer.create("subject", "Ada", "ada@example.test", Instant.EPOCH);
+        when(customerRepository.findPageWithLongOffset(2, offset)).thenReturn(List.of(customer));
+        when(customerRepository.count()).thenReturn(offset + 1);
+        var page = service.listForOperator(1_073_741_824, 2);
+        assertEquals(List.of(customer), page.getContent());
+        assertEquals(offset + 1, page.getTotalElements());
     }
 }

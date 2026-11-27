@@ -4,7 +4,10 @@ import com.anisboulila.customerservice.error.ApiProblemException;
 import com.anisboulila.customerservice.service.CustomerApplicationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -20,10 +23,12 @@ class CustomerPaginationConfigurationTest {
         when(service.findByVerifiedSubject("subject")).thenReturn(Optional.empty());
         CustomerListController controller = new CustomerListController(new CustomerIdentityValidator(), service, 5, 10);
         Jwt jwt = Jwt.withTokenValue("test").header("alg", "none").claim("sub", "subject").build();
-        assertEquals(5, controller.list(jwt, null, null).size());
-        assertEquals(10, controller.list(jwt, "0", "10").size());
+        var authentication = UsernamePasswordAuthenticationToken.authenticated("subject", null,
+                List.of(new SimpleGrantedAuthority("CUSTOMER")));
+        assertEquals(5, controller.list(jwt, null, null, authentication).size());
+        assertEquals(10, controller.list(jwt, "0", "10", authentication).size());
         assertEquals("INVALID_PAGE_SIZE",
-                assertThrows(ApiProblemException.class, () -> controller.list(jwt, "0", "11")).getCode());
+                assertThrows(ApiProblemException.class, () -> controller.list(jwt, "0", "11", authentication)).getCode());
     }
 
     @Test

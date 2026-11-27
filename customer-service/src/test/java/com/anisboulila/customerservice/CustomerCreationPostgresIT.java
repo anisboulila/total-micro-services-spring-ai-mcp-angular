@@ -1,5 +1,7 @@
 package com.anisboulila.customerservice;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.anisboulila.customerservice.service.CustomerIdempotencyRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.time.Duration;
 import java.time.Clock;
 import java.time.Instant;
@@ -74,6 +77,9 @@ class CustomerCreationPostgresIT {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
@@ -163,7 +169,72 @@ class CustomerCreationPostgresIT {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(0))
                 .andExpect(jsonPath("$.totalElements").value(0));
         mockMvc.perform(get("/api/v1/customers").header("Authorization", "Bearer operator"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    void detailMasksForeignAndMissingAndAllowsOperatorAndDualRole() throws Exception {
+        create("first", "first-detail", "{\"name\":\"Ada\"}").andExpect(status().isCreated());
+        create("second", "second-detail", "{\"name\":\"Grace\"}").andExpect(status().isCreated());
+        UUID firstId = jdbcTemplate.queryForObject(
+                "SELECT id FROM cps_customer_schema.customer WHERE sub = ?", UUID.class, "subject-one");
+        UUID secondId = jdbcTemplate.queryForObject(
+                "SELECT id FROM cps_customer_schema.customer WHERE sub = ?", UUID.class, "subject-two");
+        UUID missingId = UUID.fromString("12345678-1234-1234-1234-123456789012");
+        when(jwtDecoder.decode("dual")).thenReturn(Jwt.withTokenValue("dual").header("alg", "RS256")
+                .claim("sub", "operator").claim("realm_access", Map.of("roles", List.of("CUSTOMER", "OPERATOR")))
+                .build());
+        mockMvc.perform(get("/api/v1/customers/{id}", firstId).header("Authorization", "Bearer first"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Ada"));
+        for (String token : List.of("operator", "dual")) {
+            mockMvc.perform(get("/api/v1/customers/{id}", secondId).header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Grace"));
+            mockMvc.perform(get("/api/v1/customers/{id}", missingId).header("Authorization", "Bearer " + token))
+                    .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("CUSTOMER_NOT_FOUND"));
+        }
+        create("dual", "dual-create", "{\"name\":\"Forbidden\"}").andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN_PROFILE_CREATION"));
+        assertEquals(2, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM cps_customer_schema.customer", Integer.class));
+        String correlation = "d60c6a93-287c-49e9-9b56-40a72dc08f04";
+        var foreign = mockMvc.perform(get("/api/v1/customers/{id}", secondId)
+                        .header("Authorization", "Bearer first").header("X-Correlation-ID", correlation))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("CUSTOMER_NOT_FOUND"))
+                .andReturn().getResponse();
+        var missing = mockMvc.perform(get("/api/v1/customers/{id}", missingId)
+                        .header("Authorization", "Bearer first").header("X-Correlation-ID", correlation))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("CUSTOMER_NOT_FOUND"))
+                .andReturn().getResponse();
+        ObjectNode foreignBody = (ObjectNode) objectMapper.readTree(foreign.getContentAsString());
+        ObjectNode missingBody = (ObjectNode) objectMapper.readTree(missing.getContentAsString());
+        foreignBody.remove("instance");
+        missingBody.remove("instance");
+        assertEquals(foreignBody, missingBody);
+    }
+
+    @Test
+    void operatorPaginationUsesStableDatabaseOrdering() throws Exception {
+        String insert = """
+                INSERT INTO cps_customer_schema.customer(id, sub, name, email, created_at)
+                VALUES (?::uuid, ?, ?, ?, ?)
+                """;
+        jdbcTemplate.update(insert, "00000000-0000-0000-0000-000000000002", "s2", "Second",
+                "second@example.test", Timestamp.from(START));
+        jdbcTemplate.update(insert, "00000000-0000-0000-0000-000000000001", "s1", "First",
+                "first@example.test", Timestamp.from(START));
+        jdbcTemplate.update(insert, "00000000-0000-0000-0000-000000000003", "s3", "Newest",
+                "newest@example.test", Timestamp.from(START.plusSeconds(1)));
+        mockMvc.perform(get("/api/v1/customers").header("Authorization", "Bearer operator")
+                        .param("page", "0").param("size", "2"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].name").value("Newest"))
+                .andExpect(jsonPath("$.content[1].name").value("First"))
+                .andExpect(jsonPath("$.totalElements").value(3)).andExpect(jsonPath("$.totalPages").value(2));
+        mockMvc.perform(get("/api/v1/customers").header("Authorization", "Bearer operator")
+                        .param("page", "1").param("size", "2"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].name").value("Second"));
+        mockMvc.perform(get("/api/v1/customers").header("Authorization", "Bearer operator")
+                        .param("page", "2147483647").param("size", "100"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(3));
     }
 
     @Test

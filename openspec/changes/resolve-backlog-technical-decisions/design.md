@@ -158,6 +158,10 @@ jeton pour la v1 sans exigence de séparation d’audience.
 Cette décision technique ne modifie pas les permissions métier, le masquage
 404 ou le rôle réservé à l’auto-inscription Customer.
 
+Pour les lectures Customer, un compte cumulant `CUSTOMER` et `OPERATOR`
+dispose des droits de lecture OPERATOR. Pour la création Customer, la présence
+de `OPERATOR` interdit la création, même en présence du rôle `CUSTOMER`.
+
 ### TD-05 — Idempotence persistante
 
 **DÉCIDÉ :** la durée de conservation est de sept jours à compter du commit de

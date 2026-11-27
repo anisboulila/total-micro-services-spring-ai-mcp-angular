@@ -490,14 +490,19 @@ creation disabled there until the complete flow has been validated. Set
 `CUSTOMER_PROFILE_CREATION_ENABLED=false` to override the local setting; an
 authenticated, authorized request with valid input then receives HTTP 503
 `PROFILE_CREATION_DISABLED`.
-The response `Location` identifies the new profile, but its GET endpoint is
-not yet implemented.
+The response `Location` identifies the new profile.
 
-The authenticated `GET /api/v1/customers` currently allows only CUSTOMER
-without OPERATOR and returns only the profile matching the verified JWT subject,
-or an empty page. It does not require the email claim to be verified for reads.
-OPERATOR, including a user with both roles, receives 403 until the operator
-list is implemented in task 7.3. Page indexes are zero-based, with configurable
+The authenticated `GET /api/v1/customers` returns only the profile matching
+the verified JWT subject for CUSTOMER, or an empty page. OPERATOR can list all
+profiles; when both roles are present, OPERATOR permissions apply to reads,
+but profile creation remains forbidden. The operator list is ordered by
+`createdAt` descending and `id` ascending as a tie-breaker.
+`GET /api/v1/customers/{id}` allows CUSTOMER to read their own profile and
+OPERATOR to read any existing profile. For CUSTOMER, an absent or another
+person's profile returns the same 404 `CUSTOMER_NOT_FOUND` error, apart from
+request-specific fields such as `instance` and `correlationId`. An invalid
+identifier returns 400 `VALIDATION_FAILED`. Reads do not require a verified
+email claim. Page indexes are zero-based, with configurable
 `customer.pagination.default-size` (20) and `customer.pagination.max-size`
 (100). The response contains `content`, `page`, `size`, `totalElements`, and
 `totalPages`; invalid page or size returns 400 with `INVALID_PAGE` or

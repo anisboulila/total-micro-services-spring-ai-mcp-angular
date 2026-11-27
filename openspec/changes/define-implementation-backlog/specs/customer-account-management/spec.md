@@ -28,6 +28,11 @@ The system MUST allow an authenticated customer to create one profile linked to 
 - **WHEN** il soumet une création de fiche Customer pour une autre personne
 - **THEN** la création est refusée
 
+#### Scenario: Création par un compte cumulant les rôles
+- **GIVEN** un utilisateur authentifié possédant à la fois `CUSTOMER` et `OPERATOR`
+- **WHEN** il demande la création d'un profil Customer
+- **THEN** la création est refusée avec HTTP 403 `FORBIDDEN_PROFILE_CREATION`
+
 ### Requirement: US-02 — Lister les fiches Customer autorisées
 
 The system MUST return only customer profiles the authenticated actor is permitted to see.
@@ -41,6 +46,11 @@ The system MUST return only customer profiles the authenticated actor is permitt
 - **GIVEN** un opérateur/admin authentifié
 - **WHEN** il demande la liste des fiches Customer
 - **THEN** la réponse peut contenir toutes les fiches Customer
+
+#### Scenario: Liste avec les deux rôles
+- **GIVEN** un utilisateur authentifié possédant `CUSTOMER` et `OPERATOR`
+- **WHEN** il demande la liste Customer
+- **THEN** les droits de lecture OPERATOR s'appliquent et la liste globale est paginée
 
 #### Scenario: Pagination des fiches
 - **GIVEN** une demande de liste sans taille précisée ou une taille supérieure au maximum
@@ -66,6 +76,11 @@ The system MUST authorize Customer detail reads at the service that owns the pro
 - **GIVEN** un opérateur/admin authentifié et une fiche Customer existante
 - **WHEN** il demande cette fiche
 - **THEN** le service retourne la fiche
+
+#### Scenario: Détail avec les deux rôles
+- **GIVEN** un utilisateur authentifié possédant `CUSTOMER` et `OPERATOR`
+- **WHEN** il demande une fiche Customer existante par identifiant
+- **THEN** les droits de lecture OPERATOR s'appliquent et le service retourne la fiche
 
 ### Requirement: US-04 — Lister les comptes autorisés
 

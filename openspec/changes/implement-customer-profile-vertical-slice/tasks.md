@@ -445,7 +445,7 @@ défaut en l'absence de profil explicite.
 
 ## 7. Lectures, tests d’intégration et bout en bout
 
-- [ ] 7.1 **CPS-API-05** — Lister le profil du client
+- [x] 7.1 **CPS-API-05** — Lister le profil du client
 
 - **Objectif / résultat :** CUSTOMER ne liste que son profil.
 - **Dépendances :** CPS-SEC-01, CPS-API-03.
@@ -455,8 +455,8 @@ défaut en l'absence de profil explicite.
 - **Commandes :** `mvn -pl customer-service -am test`.
 - **Vérification / acceptation :** réponse contient uniquement profil lié à `sub`, ou page vide; aucun filtre identité choisi par client.
 - **Erreurs / diagnostic :** filtrage fait uniquement par Gateway est refusé; tester service propriétaire.
-- **Preuve automatisée :** `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerListControllerTest,CustomerPaginationConfigurationTest,CustomerControllerTest,CustomerCreationDisabledTest,CustomerCreationLocalDisabledTest,CustomerIdentityValidatorTest,CustomerApplicationServiceTest,CustomerSecurityConfigurationTest" "-Dit.test=CustomerCreationPostgresIT" verify` a retourné `BUILD SUCCESS` : 31 tests ciblés et 14 tests PostgreSQL isolés, sans échec. La lecture filtre par `sub` vérifié et retourne une page vide si aucun profil ; les valeurs de pagination sont configurables et contrôlées. OPERATOR et le double rôle sont temporairement refusés (403) en attendant 7.3. Les JWT sont simulés pour les tests MVC/PostgreSQL ; aucun test manuel ou Gateway/Keycloak de bout en bout n'a été exécuté pour ce GET.
-- **Point d’arrêt :** attendre matrice CUSTOMER avant détail.
+- **Preuve automatisée :** `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerListControllerTest,CustomerPaginationConfigurationTest,CustomerControllerTest,CustomerCreationDisabledTest,CustomerCreationLocalDisabledTest,CustomerIdentityValidatorTest,CustomerApplicationServiceTest,CustomerSecurityConfigurationTest" "-Dit.test=CustomerCreationPostgresIT" verify` a retourné `BUILD SUCCESS` : 31 tests ciblés et 14 tests PostgreSQL isolés, sans échec. La lecture filtre par `sub` vérifié et retourne une page vide si aucun profil ; les valeurs de pagination sont configurables et contrôlées. OPERATOR et le double rôle sont temporairement refusés (403) en attendant 7.3. Les JWT sont simulés pour les tests MVC/PostgreSQL.
+- **Preuve manuelle et validation :** l'apprenant a observé via Gateway et Keycloak les profils isolés de deux clients, la liste vide pour un client sans profil, le 403 `FORBIDDEN` pour OPERATOR, le 401 sans token, le 400 `INVALID_PAGE_SIZE` pour `size=101`, la page 1 vide avec totaux inchangés et l'ignorance d'un paramètre `sub` falsifié. L'apprenant valide la tâche sans poursuivre tous les cas manuels ; la page négative et le double rôle n'ont pas été confirmés manuellement.
 
 - [ ] 7.2 **CPS-API-06** — Consulter un Customer par identifiant
 
@@ -468,6 +468,7 @@ défaut en l'absence de profil explicite.
 - **Commandes :** `mvn -pl customer-service -am test`.
 - **Vérification / acceptation :** client lit le sien; absent et étranger donnent même HTTP 404 et contrat d’erreur.
 - **Erreurs / diagnostic :** comparer status et corps des deux 404; ne pas révéler l’existence.
+- **Preuve automatisée :** tests MVC et PostgreSQL ciblés réussis : lecture propriétaire et opérateur, priorité du double rôle, refus de création pour le double rôle et mêmes erreurs 404 pour identifiant étranger et absent (hors `instance`, propre à l'URL). Les JWT sont simulés ; la validation manuelle via Keycloak et Gateway reste à faire.
 - **Point d’arrêt :** attendre les deux cas vérifiés.
 
 - [ ] 7.3 **CPS-API-07** — Paginer la liste opérateur
@@ -480,6 +481,7 @@ défaut en l'absence de profil explicite.
 - **Commandes :** `mvn -pl customer-service -am test`.
 - **Vérification / acceptation :** OPERATOR voit tous; défaut 20; max 100; ordre `createdAt DESC, id ASC`; invalides HTTP 400.
 - **Erreurs / diagnostic :** vérifier ordre sur timestamps égaux et code `INVALID_PAGE_SIZE`; aucune troncature silencieuse.
+- **Preuve automatisée :** `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerListControllerTest,CustomerPaginationConfigurationTest,CustomerControllerTest,CustomerCreationDisabledTest,CustomerCreationLocalDisabledTest,CustomerIdentityValidatorTest,CustomerApplicationServiceTest,CustomerSecurityConfigurationTest" "-Dit.test=CustomerCreationPostgresIT" verify` : `BUILD SUCCESS`, 35 tests ciblés et 16 tests PostgreSQL isolés, sans échec. La pagination globale, le tri sur timestamps égaux, les limites, le double rôle et un offset supérieur à la limite JPA sont testés. Les JWT sont simulés ; la validation manuelle reste à faire.
 - **Point d’arrêt :** attendre résultats sur limites.
 
 - [ ] 7.4 **CPS-TEST-01** — Compléter les tests unitaires

@@ -69,12 +69,8 @@ public class CustomerSecurityConfiguration {
                             return new AuthorizationDecision(hasAuthority(actor, "CUSTOMER")
                                     && !hasAuthority(actor, "OPERATOR"));
                         })
-                        // En attendant la liste opérateur, seul CUSTOMER accède à sa propre liste.
-                        .requestMatchers(HttpMethod.GET, "/api/v1/customers").access((authentication, context) -> {
-                            Authentication actor = authentication.get();
-                            return new AuthorizationDecision(hasAuthority(actor, "CUSTOMER")
-                                    && !hasAuthority(actor, "OPERATOR"));
-                        })
+                        .requestMatchers(HttpMethod.GET, "/api/v1/customers", "/api/v1/customers/*")
+                        .hasAnyAuthority("CUSTOMER", "OPERATOR")
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(problemEntryPoint)

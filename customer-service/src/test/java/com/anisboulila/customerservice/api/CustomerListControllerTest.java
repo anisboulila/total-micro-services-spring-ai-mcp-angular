@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -20,6 +22,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -93,13 +96,46 @@ class CustomerListControllerTest {
     @Test
     void rejectsUnauthorizedRolesAndInvalidSubject() throws Exception {
         mockMvc.perform(get("/api/v1/customers")).andExpect(status().isUnauthorized());
-        for (String token : List.of("operator", "dual", "other")) {
+        for (String token : List.of("other")) {
             mockMvc.perform(get("/api/v1/customers").header("Authorization", "Bearer " + token))
                     .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
         }
         mockMvc.perform(get("/api/v1/customers").header("Authorization", "Bearer blank"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         verifyNoInteractions(customers);
+    }
+
+    @Test
+    void operatorAndDualRoleReceiveGlobalPage() throws Exception {
+        when(customers.listForOperator(0, 20)).thenReturn(new PageImpl<>(
+                List.of(Customer.create("other", "Bob", "bob@example.test", Instant.EPOCH)),
+                PageRequest.of(0, 20), 1));
+        for (String token : List.of("operator", "dual")) {
+            mockMvc.perform(get("/api/v1/customers").header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].name").value("Bob"))
+                    .andExpect(jsonPath("$.totalElements").value(1));
+        }
+        verify(customers, times(2)).listForOperator(0, 20);
+        verify(customers, never()).findByVerifiedSubject(anyString());
+    }
+
+    @Test
+    void detailUsesActorScopeAndOperatorPrecedence() throws Exception {
+        UUID id = UUID.fromString("12345678-1234-1234-1234-123456789012");
+        var customer = Customer.create("subject-one", "Alice", "alice@example.test", Instant.EPOCH);
+        when(customers.findReadable(id, "subject-one", false)).thenReturn(Optional.of(customer));
+        when(customers.findReadable(id, "operator", true)).thenReturn(Optional.of(customer));
+        when(customers.findReadable(id, "dual", true)).thenReturn(Optional.of(customer));
+        for (String token : List.of("customer", "operator", "dual")) {
+            mockMvc.perform(get("/api/v1/customers/{id}", id).header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Alice"))
+                    .andExpect(jsonPath("$.sub").doesNotExist());
+        }
+        mockMvc.perform(get("/api/v1/customers/{id}", id)).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/customers/{id}", id).header("Authorization", "Bearer other"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/customers/not-a-uuid").header("Authorization", "Bearer customer"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
 
     private static Jwt jwt(String sub, List<String> roles) {

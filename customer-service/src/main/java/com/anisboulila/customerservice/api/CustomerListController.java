@@ -4,15 +4,18 @@ import com.anisboulila.customerservice.error.ApiProblemException;
 import com.anisboulila.customerservice.service.CustomerApplicationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/customers")
@@ -38,18 +41,49 @@ public class CustomerListController {
     @GetMapping
     public CustomerPage list(@AuthenticationPrincipal Jwt jwt,
                              @RequestParam(required = false) String page,
-                             @RequestParam(required = false) String size) {
+                             @RequestParam(required = false) String size,
+                             Authentication authentication) {
         String sub = identity.validatedSubject(jwt);
         int pageNumber = parse(page, 0, "INVALID_PAGE", false);
         int pageSize = parse(size, defaultSize, "INVALID_PAGE_SIZE", true);
         if (pageSize > maxSize) {
             throw invalid("INVALID_PAGE_SIZE");
         }
+        if (isOperator(authentication)) {
+            var result = customers.listForOperator(pageNumber, pageSize);
+            return new CustomerPage(result.getContent().stream().map(CustomerResponse::from).toList(),
+                    pageNumber, pageSize, result.getTotalElements(), result.getTotalPages());
+        }
         Optional<CustomerResponse> result = customers.findByVerifiedSubject(sub).map(CustomerResponse::from);
         // L'unicité de sub limite le résultat à une seule fiche.
         List<CustomerResponse> content = pageNumber == 0 ? result.stream().toList() : List.of();
         int total = result.isPresent() ? 1 : 0;
         return new CustomerPage(content, pageNumber, pageSize, total, total);
+    }
+
+    @GetMapping("/{id}")
+    public CustomerResponse detail(@AuthenticationPrincipal Jwt jwt, @PathVariable String id,
+                                   Authentication authentication) {
+        String sub = identity.validatedSubject(jwt);
+        UUID customerId;
+        try {
+            customerId = UUID.fromString(id);
+            if (!customerId.toString().equalsIgnoreCase(id)) {
+                throw new IllegalArgumentException("Invalid UUID");
+            }
+        } catch (IllegalArgumentException exception) {
+            throw new ApiProblemException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED",
+                    "Invalid request", "The customer identifier is invalid.");
+        }
+        return customers.findReadable(customerId, sub, isOperator(authentication))
+                .map(CustomerResponse::from)
+                .orElseThrow(() -> new ApiProblemException(HttpStatus.NOT_FOUND, "CUSTOMER_NOT_FOUND",
+                        "Customer not found", "Customer not found."));
+    }
+
+    private boolean isOperator(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("OPERATOR"));
     }
 
     private int parse(String value, int fallback, String code, boolean positive) {
