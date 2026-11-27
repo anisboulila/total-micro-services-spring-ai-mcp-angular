@@ -44,6 +44,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.ArgumentMatchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @Testcontainers
@@ -142,6 +143,27 @@ class CustomerCreationPostgresIT {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN_PROFILE_CREATION"));
         assertEquals(0, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM cps_customer_schema.customer", Integer.class));
+    }
+
+    @Test
+    void listsOnlyAuthenticatedCustomerFromPostgres() throws Exception {
+        create("first", "first-list-key", "{\"name\":\"Ada\"}").andExpect(status().isCreated());
+        create("second", "second-list-key", "{\"name\":\"Grace\"}").andExpect(status().isCreated());
+        when(jwtDecoder.decode("without-profile")).thenReturn(jwt("subject-three", "third@example.test", "CUSTOMER"));
+        mockMvc.perform(get("/api/v1/customers").header("Authorization", "Bearer first")
+                        .param("sub", "subject-two").header("X-User-Id", "subject-two"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].name").value("Ada"))
+                .andExpect(jsonPath("$.content[0].sub").doesNotExist())
+                .andExpect(jsonPath("$.totalElements").value(1));
+        mockMvc.perform(get("/api/v1/customers").header("Authorization", "Bearer second"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].name").value("Grace"));
+        mockMvc.perform(get("/api/v1/customers").header("Authorization", "Bearer without-profile"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0));
+        mockMvc.perform(get("/api/v1/customers").header("Authorization", "Bearer operator"))
+                .andExpect(status().isForbidden());
     }
 
     @Test

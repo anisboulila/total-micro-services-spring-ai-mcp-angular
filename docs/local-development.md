@@ -493,6 +493,16 @@ authenticated, authorized request with valid input then receives HTTP 503
 The response `Location` identifies the new profile, but its GET endpoint is
 not yet implemented.
 
+The authenticated `GET /api/v1/customers` currently allows only CUSTOMER
+without OPERATOR and returns only the profile matching the verified JWT subject,
+or an empty page. It does not require the email claim to be verified for reads.
+OPERATOR, including a user with both roles, receives 403 until the operator
+list is implemented in task 7.3. Page indexes are zero-based, with configurable
+`customer.pagination.default-size` (20) and `customer.pagination.max-size`
+(100). The response contains `content`, `page`, `size`, `totalElements`, and
+`totalPages`; invalid page or size returns 400 with `INVALID_PAGE` or
+`INVALID_PAGE_SIZE`. The creation flag does not disable this read.
+
 The first idempotency increment persists a successful response and its SHA-256
 request fingerprint together with the Customer in one database transaction.
 Its unique key is scoped to the verified subject and operation in this service's

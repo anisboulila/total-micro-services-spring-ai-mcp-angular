@@ -455,6 +455,7 @@ défaut en l'absence de profil explicite.
 - **Commandes :** `mvn -pl customer-service -am test`.
 - **Vérification / acceptation :** réponse contient uniquement profil lié à `sub`, ou page vide; aucun filtre identité choisi par client.
 - **Erreurs / diagnostic :** filtrage fait uniquement par Gateway est refusé; tester service propriétaire.
+- **Preuve automatisée :** `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerListControllerTest,CustomerPaginationConfigurationTest,CustomerControllerTest,CustomerCreationDisabledTest,CustomerCreationLocalDisabledTest,CustomerIdentityValidatorTest,CustomerApplicationServiceTest,CustomerSecurityConfigurationTest" "-Dit.test=CustomerCreationPostgresIT" verify` a retourné `BUILD SUCCESS` : 31 tests ciblés et 14 tests PostgreSQL isolés, sans échec. La lecture filtre par `sub` vérifié et retourne une page vide si aucun profil ; les valeurs de pagination sont configurables et contrôlées. OPERATOR et le double rôle sont temporairement refusés (403) en attendant 7.3. Les JWT sont simulés pour les tests MVC/PostgreSQL ; aucun test manuel ou Gateway/Keycloak de bout en bout n'a été exécuté pour ce GET.
 - **Point d’arrêt :** attendre matrice CUSTOMER avant détail.
 
 - [ ] 7.2 **CPS-API-06** — Consulter un Customer par identifiant

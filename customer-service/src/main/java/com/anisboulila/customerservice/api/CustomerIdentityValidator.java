@@ -11,13 +11,7 @@ import java.util.Objects;
 public class CustomerIdentityValidator {
 
     public VerifiedIdentity validate(Jwt verifiedJwt) {
-        Objects.requireNonNull(verifiedJwt, "verifiedJwt");
-        Object subject = verifiedJwt.getClaims().get("sub");
-        if (!(subject instanceof String sub) || sub.isBlank()) {
-            throw new ApiProblemException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED",
-                    "Invalid request", "The authenticated identity is invalid.");
-        }
-
+        String sub = validatedSubject(verifiedJwt);
         Object emailClaim = verifiedJwt.getClaims().get("email");
         if (!(emailClaim instanceof String email) || email.isBlank()
                 || !Boolean.TRUE.equals(verifiedJwt.getClaims().get("email_verified"))) {
@@ -25,6 +19,17 @@ public class CustomerIdentityValidator {
                     "Email not verified", "A verified email is required.");
         }
         return new VerifiedIdentity(sub, email);
+    }
+
+    public String validatedSubject(Jwt verifiedJwt) {
+        Objects.requireNonNull(verifiedJwt, "verifiedJwt");
+        Object subject = verifiedJwt.getClaims().get("sub");
+        if (!(subject instanceof String sub) || sub.isBlank()) {
+            throw new ApiProblemException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED",
+                    "Invalid request", "The authenticated identity is invalid.");
+        }
+
+        return sub;
     }
 
     public record VerifiedIdentity(String sub, String email) {

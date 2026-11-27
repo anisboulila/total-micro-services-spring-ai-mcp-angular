@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.util.Optional;
 
 @Service
 public class CustomerApplicationService {
@@ -24,5 +25,10 @@ public class CustomerApplicationService {
         Customer customer = Customer.create(sub, name, email, clock.instant());
         // Déclencher les contraintes avant la fin de la transaction pour traduire les conflits.
         return customerRepository.saveAndFlush(customer);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Customer> findByVerifiedSubject(String sub) {
+        return customerRepository.findBySub(sub);
     }
 }

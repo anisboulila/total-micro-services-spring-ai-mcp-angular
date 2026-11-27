@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -66,5 +67,14 @@ class CustomerApplicationServiceTest {
                 "oidc-subject", "Ada", "ada@example.test", Instant.EPOCH);
 
         assertNull(customer.getId());
+    }
+
+    @Test
+    void retrievesOnlyByVerifiedSubject() {
+        CustomerApplicationService service = new CustomerApplicationService(customerRepository, Clock.systemUTC());
+        Customer customer = Customer.create("subject", "Ada", "ada@example.test", Instant.EPOCH);
+        when(customerRepository.findBySub("subject")).thenReturn(Optional.of(customer));
+        assertEquals(Optional.of(customer), service.findByVerifiedSubject("subject"));
+        verify(customerRepository).findBySub("subject");
     }
 }
