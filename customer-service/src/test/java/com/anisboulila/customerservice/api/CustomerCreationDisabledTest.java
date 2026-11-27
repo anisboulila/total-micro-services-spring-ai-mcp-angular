@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -22,7 +23,12 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(controllers = CustomerController.class)
+@WebMvcTest(controllers = CustomerController.class, properties = {
+        "customer.security.jwt.issuer-uri=http://localhost/test-issuer",
+        "customer.security.jwt.jwk-set-uri=http://localhost/test-jwks",
+        "customer.security.jwt.audience=customer-service"
+})
+@ActiveProfiles("test")
 @Import({CustomerSecurityConfiguration.class, SecurityProblemWriter.class, CorrelationIdFilter.class,
         RestProblemExceptionHandler.class, CustomerIdentityValidator.class})
 class CustomerCreationDisabledTest {

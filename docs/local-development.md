@@ -482,11 +482,14 @@ test-only and does not create a Customer.
 
 The Customer POST controller integrates those validators and requires the
 `CUSTOMER` role while rejecting `OPERATOR`, including when both roles are
-present. Profile creation is disabled by default: authenticated, authorized
-requests with valid input receive HTTP 503 `PROFILE_CREATION_DISABLED` until
-the feature is enabled. The test property `customer.profile-creation.enabled`
-explicitly enables it in isolated tests only. Do not enable it for normal use
-until the complete creation flow has been validated.
+present. The base configuration disables profile creation, but the `local`
+profile enables it for development and manual tests. Since `local` is also
+the default profile when none is specified, creation is enabled in that case.
+Always choose an explicit non-local profile outside local development and keep
+creation disabled there until the complete flow has been validated. Set
+`CUSTOMER_PROFILE_CREATION_ENABLED=false` to override the local setting; an
+authenticated, authorized request with valid input then receives HTTP 503
+`PROFILE_CREATION_DISABLED`.
 The response `Location` identifies the new profile, but its GET endpoint is
 not yet implemented.
 

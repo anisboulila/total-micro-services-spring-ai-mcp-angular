@@ -358,7 +358,7 @@
 - **Preuve observée :** l’apprenant a exécuté `mvn -pl customer-service -am test` et rapporté `BUILD SUCCESS` : 21 tests, sans échec, erreur ni test ignoré. Les tests de validation couvrent notamment les limites du nom après normalisation, le rejet des champs réservés et l’absence ou la non-vérification de l’e-mail. Le contrôleur de validation est réservé aux tests; aucun POST métier n’a encore été ajouté.
 - **Point d’arrêt :** attendre tests DTO avant POST.
 
-- [ ] 5.5 **CPS-API-03** — Créer un profil Customer
+- [x] 5.5 **CPS-API-03** — Créer un profil Customer
 
 - **Objectif / résultat :** `POST /api/v1/customers` réalise l’auto-inscription et renvoie 201.
 - **Dépendances :** CPS-DOM-01, CPS-SEC-01, CPS-API-01, CPS-API-02, CPS-DB-02.
@@ -369,7 +369,7 @@
 - **Vérification / acceptation :** profil lié au `sub`/email du token, HTTP 201 avec représentation et `Location`; OPERATOR reçoit 403 `FORBIDDEN_PROFILE_CREATION` et aucune écriture.
 - **Erreurs / diagnostic :** claim absent vs contexte Security; examiner logs corrélés et ne jamais imprimer bearer.
 - **Preuve partielle :** le test manuel authentifié est passé par Gateway et Customer, puis a retourné 503 `PROFILE_CREATION_DISABLED` comme prévu. Le test PostgreSQL isolé `CustomerCreationPostgresIT` vérifie 201, `Location`, persistance et refus OPERATOR, avec décodage JWT simulé et fonctionnalité activée uniquement pour le test ; il ne valide pas Keycloak de bout en bout.
-- **Point d’arrêt :** attendre cas nominaux et refus avant conflits.
+- **Validation complémentaire :** l'apprenant a ensuite obtenu une création 201 via Keycloak et Gateway, avec persistance liée au résultat idempotent, puis un refus 403 avec un compte OPERATOR. Le code exact du 403, l'absence d'écriture OPERATOR et `Location` sont vérifiés par les tests automatisés ; leur comparaison manuelle n'a pas été confirmée.
 
 - [x] 5.6 **CPS-API-04** — Traduire les conflits d’identité
 
@@ -382,8 +382,7 @@
 - **Vérification / acceptation :** `sub` existant => 409 `CUSTOMER_PROFILE_EXISTS`; email existant => 409 `EMAIL_ALREADY_EXISTS`; aucun email absent/non vérifié n’est traité comme erreur générique (`EMAIL_NOT_VERIFIED`).
 - **Erreurs / diagnostic :** ne pas convertir toute `DataIntegrityViolationException` en doublon email; inspecter la contrainte.
 - **Preuve automatisée :** la commande ciblée `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,CustomerApplicationServiceTest" "-Dit.test=CustomerCreationPostgresIT" verify` a retourné `BUILD SUCCESS` : 9 tests unitaires/MVC et 2 tests d'intégration réussis. PostgreSQL isolé a vérifié les deux conflits et l'absence de modification du profil existant ; le JWT reste simulé.
-- **Validation :** acceptée par l'apprenant sur les tests automatisés ; le test manuel avec Keycloak et Gateway est reporté. La tâche 5.5, dont dépend 5.6, reste ouverte.
-- **Point d’arrêt :** attendre les deux tests de conflit.
+- **Validation :** acceptée par l'apprenant sur les tests automatisés. Le conflit de `sub` a aussi été observé manuellement ; le conflit d'e-mail avec Keycloak reste non exécuté.
 
 ## 6. Idempotence et concurrence
 
@@ -398,9 +397,9 @@
 - **Vérification / acceptation :** portée acteur/opération/service; réponse HTTP/corps stockés avec la ressource; expiration UTC de 7 jours; aucun token persisté/loggé.
 - **Erreurs / diagnostic :** ressource sans clé ou clé sans ressource révèle transaction non atomique.
 - **Preuve automatisée :** `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,CustomerCreationDisabledTest,CustomerApplicationServiceTest" "-Dit.test=CustomerCreationPostgresIT" verify` a retourné `BUILD SUCCESS` : 11 tests ciblés et 4 tests PostgreSQL isolés réussis. Les tests vérifient la réponse stockée, l'empreinte, la portée, les sept jours et l'annulation des deux écritures après une erreur simulée. La création reste désactivée par défaut ; rejeu et concurrence restent à implémenter.
-- **Point d’arrêt :** attendre la preuve du commit atomique.
+- **Limite bloquante TD-05 :** les sept jours sont calculés avant le commit, et non à partir du commit de succès. Le test mesure sept jours entre les timestamps stockés, sans prouver sept jours après le commit. La tâche reste ouverte jusqu'à résolution ou modification explicite de la décision.
 
-- [ ] 6.2 **CPS-IDEM-02** — Tester rejeu, conflit et expiration
+- [x] 6.2 **CPS-IDEM-02** — Tester rejeu, conflit et expiration
 
 - **Objectif / résultat :** vérifier les cas séquentiels d’idempotence.
 - **Dépendances :** CPS-IDEM-01.
@@ -411,9 +410,9 @@
 - **Vérification / acceptation :** même clé/contenu rejoue statut/corps; autre contenu 409; absent/vide/>255 = 400; expiration autorise nouvelle commande.
 - **Erreurs / diagnostic :** vérifier empreinte insensible à l’ordre JSON mais sensible aux valeurs fonctionnelles.
 - **Preuve automatisée :** `mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,CustomerCreationDisabledTest,CustomerApplicationServiceTest" "-Dit.test=CustomerCreationPostgresIT" verify` a retourné `BUILD SUCCESS` : 12 tests ciblés et 8 tests PostgreSQL isolés. Le test vérifie le rejeu séquentiel exact, le conflit de contenu, la portée par acteur, la frontière des sept jours et le rollback d'une suppression expirée en cas de conflit. Le JWT est simulé ; les premières requêtes concurrentes restent à traiter en 6.3.
-- **Point d’arrêt :** attendre résultats séquentiels avant concurrence.
+- **Validation :** rejeu, normalisation, conflit de contenu et limites de clé observés manuellement ; expiration manuelle reportée. Tests séquentiels PostgreSQL réussis, avec horloge contrôlée. La dépendance 6.1 conserve la limite TD-05 ci-dessus.
 
-- [ ] 6.3 **CPS-IDEM-03** — Tester les requêtes concurrentes
+- [x] 6.3 **CPS-IDEM-03** — Tester les requêtes concurrentes
 
 - **Objectif / résultat :** prouver l’unicité en course sur PostgreSQL.
 - **Dépendances :** CPS-IDEM-02, CPS-DB-02.
@@ -425,7 +424,24 @@
 - **Erreurs / diagnostic :** tests séquentiels/H2 ne prouvent pas la concurrence; confirmer PostgreSQL Testcontainers et synchronisation effective.
 - **Preuve automatisée :** commande ciblée réussie : 12 tests unitaires/MVC et 13 tests d'intégration PostgreSQL isolé. Les tests observent les verrous en attente dans PostgreSQL et vérifient le rejeu exact de quatre demandes, le conflit de contenu, le rollback du premier traitement, la séparation entre acteurs et le remplacement d'une clé expirée. Ils utilisent plusieurs connexions mais un seul contexte applicatif ; le JWT est simulé, sans test de deux instances ou parcours Gateway/Keycloak. La création reste désactivée par défaut.
 - **Limite existante :** l'expiration est calculée avant le commit, et non exactement sept jours après le commit comme indiqué par TD-05.
-- **Point d’arrêt :** attendre résultats avant lecture.
+- **Validation :** tests concurrents PostgreSQL automatisés réussis ; validation manuelle et test de deux instances applicatives distinctes reportés. La dépendance 6.1 conserve la limite TD-05 ci-dessus.
+
+**Nouvelle vérification automatisée 5.5–6.3 :** le 27 novembre 2026,
+`mvn -pl customer-service -Pflyway-testcontainers "-Dtest=CustomerControllerTest,CustomerCreationDisabledTest,CustomerCreationLocalDisabledTest,CustomerApplicationServiceTest" "-Dit.test=CustomerCreationPostgresIT" verify`
+a retourné `BUILD SUCCESS` : 13 tests ciblés et 13 tests PostgreSQL isolés,
+sans échec. La configuration locale active maintenant la création ; la
+configuration générale la désactive, mais le profil `local` est le profil par
+défaut en l'absence de profil explicite.
+
+- [ ] 6.4 **CPS-TEST-MANUAL-01** — Valider manuellement la création et l'idempotence
+
+- **Objectif / résultat :** exécuter avec Postman, Keycloak, Gateway et DBeaver les scénarios de création, conflits, rejeu, expiration et concurrence liés à 5.5–6.3.
+- **Dépendances :** implémentations 5.5–6.3 présentes dans l'image Customer utilisée ; PostgreSQL et Keycloak de test disponibles.
+- **Apprenant :** suit pas à pas le [guide de test manuel](../../../docs/customer-profile-manual-tests.md), note les résultats sans partager jetons ni données sensibles et valide chaque scénario.
+- **Vérification / acceptation :** résultats HTTP et données PostgreSQL conformes à la matrice ; les limites et cas non exécutés restent explicitement signalés. La concurrence observée avec une seule instance ne prouve pas un déploiement multi-instance.
+- **État au 27 novembre 2026 :** tests manuels suspendus à la demande de l'apprenant. Création, rejeu, normalisation, conflit de contenu, conflit de `sub`, deuxième acteur, refus OPERATOR, absence de token, validation du corps et bornes de clé ont été observés. L'absence de résultat pour les clés des tests de conflit `sub` et de validation a été vérifiée en base. Le code exact du refus OPERATOR, son absence d'écriture et `Location` n'ont pas été confirmés manuellement. Le refus e-mail non vérifié a été observé sans contrôle immédiat en base. Le conflit d'e-mail, l'expiration, les courses manuelles et le scénario multi-instance restent non exécutés.
+- **Sécurité / nettoyage :** activer la création temporairement sur l'environnement de test uniquement ; ne supprimer que les données de test identifiées et remettre le flag à `false` après les essais.
+- **Point d'arrêt :** ne cocher cette tâche qu'après reprise et examen des résultats manuels avec l'apprenant.
 
 ## 7. Lectures, tests d’intégration et bout en bout
 
